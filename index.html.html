@@ -319,6 +319,7 @@
         function fmt(n) { return 'NT$ ' + (n||0).toLocaleString(); }
         function fmtDate(d) { return d ? new Date(d).toLocaleDateString('zh-TW') : '-'; }
         function genId(p) { return (p||'id') + '_' + Date.now() + '_' + Math.random().toString(36).substr(2,4); }
+        function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
         function getData(k) {
             try { return JSON.parse(localStorage.getItem('zt_'+k)) || []; }
@@ -493,7 +494,7 @@
             } else {
                 for (var m = 0; m < Math.min(5, projects.length); m++) {
                     var proj = projects[m];
-                    projHtml += '<div class="flex justify-between py-2 border-b border-slate-700"><span>' + proj.code + ' ' + proj.name + '</span><span class="text-amber-400">' + (proj.collectionRate||0).toFixed(1) + '%</span></div>';
+                    projHtml += '<div class="flex justify-between py-2 border-b border-slate-700"><span>' + esc(proj.code) + ' ' + esc(proj.name) + '</span><span class="text-amber-400">' + (proj.collectionRate||0).toFixed(1) + '%</span></div>';
                 }
             }
             $('dashboardProjects').innerHTML = projHtml;
@@ -506,7 +507,7 @@
             } else {
                 for (var n = 0; n < Math.min(5, pending.length); n++) {
                     var ar2 = pending[n];
-                    dueHtml += '<div class="flex justify-between py-2 border-b border-slate-700"><span>' + (ar2.projectCode||'-') + '</span><span class="mono">' + fmt(ar2.amount - (ar2.paidAmount||0)) + '</span><span>' + fmtDate(ar2.dueDate) + '</span></div>';
+                    dueHtml += '<div class="flex justify-between py-2 border-b border-slate-700"><span>' + esc(ar2.projectCode||'-') + '</span><span class="mono">' + fmt(ar2.amount - (ar2.paidAmount||0)) + '</span><span>' + fmtDate(ar2.dueDate) + '</span></div>';
                 }
             }
             $('dashboardDue').innerHTML = dueHtml;
@@ -544,9 +545,9 @@
                 else { status = '待收款'; statusCls = 'bg-blue-500/20 text-blue-300'; }
 
                 html += '<tr class="border-t border-slate-700 hover:bg-slate-800/50">' +
-                    '<td class="p-4">' + (ar.projectCode||'-') + '</td>' +
-                    '<td class="p-4">' + (ar.customerName||'-') + '</td>' +
-                    '<td class="p-4">' + (AR_TYPES[ar.type]||ar.type) + '</td>' +
+                    '<td class="p-4">' + esc(ar.projectCode||'-') + '</td>' +
+                    '<td class="p-4">' + esc(ar.customerName||'-') + '</td>' +
+                    '<td class="p-4">' + esc(AR_TYPES[ar.type]||ar.type) + '</td>' +
                     '<td class="p-4 text-right mono">' + fmt(ar.amount) + '</td>' +
                     '<td class="p-4 text-right mono text-green-400">' + fmt(paid) + '</td>' +
                     '<td class="p-4">' + fmtDate(ar.dueDate) + '</td>' +
@@ -653,9 +654,11 @@
             };
 
             var arList = getData('ar');
+            var oldProjectId = null;
             if (editId) {
                 for (var k = 0; k < arList.length; k++) {
                     if (arList[k].id === editId) {
+                        oldProjectId = arList[k].projectId;
                         arData.paidAmount = arList[k].paidAmount || 0;
                         arData.createdAt = arList[k].createdAt;
                         arList[k] = arData;
@@ -668,6 +671,9 @@
 
             setData('ar', arList);
             updateProjectCollectionRate(arData.projectId);
+            if (oldProjectId && oldProjectId !== arData.projectId) {
+                updateProjectCollectionRate(oldProjectId);
+            }
             closeModal();
             loadArList();
             toast('已儲存', 'success');
@@ -701,6 +707,10 @@
             $('mPayConfirm').onclick = function() {
                 var arId = this.getAttribute('data-id');
                 var amount = parseFloat($('mPayAmount').value) || 0;
+                if (amount <= 0) {
+                    toast('收款金額必須大於 0', 'error');
+                    return;
+                }
                 var list = getData('ar');
                 var projectId = null;
                 for (var i = 0; i < list.length; i++) {
@@ -784,9 +794,9 @@
                 var statusCls = ap.status === 'paid' ? 'bg-green-500/20 text-green-300' : 'bg-amber-500/20 text-amber-300';
 
                 html += '<tr class="border-t border-slate-700 hover:bg-slate-800/50">' +
-                    '<td class="p-4">' + (PM_TYPES[ap.paymentType]||ap.paymentType) + '</td>' +
-                    '<td class="p-4">' + (ap.projectCode||'-') + '</td>' +
-                    '<td class="p-4">' + (ap.vendorName||'-') + '</td>' +
+                    '<td class="p-4">' + esc(PM_TYPES[ap.paymentType]||ap.paymentType) + '</td>' +
+                    '<td class="p-4">' + esc(ap.projectCode||'-') + '</td>' +
+                    '<td class="p-4">' + esc(ap.vendorName||'-') + '</td>' +
                     '<td class="p-4 text-right mono">' + fmt(ap.amount) + '</td>' +
                     '<td class="p-4">' + fmtDate(ap.dueDate) + '</td>' +
                     '<td class="p-4"><span class="px-2 py-1 rounded text-xs ' + statusCls + '">' + status + '</span></td>' +
@@ -894,6 +904,7 @@
                 for (var k = 0; k < apList.length; k++) {
                     if (apList[k].id === editId) {
                         apData.status = apList[k].status;
+                        apData.createdAt = apList[k].createdAt;
                         apList[k] = apData;
                         break;
                     }
@@ -969,12 +980,12 @@
 
                 html += '<div class="data-table rounded-xl overflow-hidden">' +
                     '<div class="p-4 border-b border-slate-700 flex justify-between items-center">' +
-                    '<div class="flex items-center gap-3"><span class="text-2xl">🏗️</span><div><h4 class="font-bold">' + p.code + '</h4><p class="text-sm text-slate-400">' + p.name + '</p></div></div>' +
+                    '<div class="flex items-center gap-3"><span class="text-2xl">🏗️</span><div><h4 class="font-bold">' + esc(p.code) + '</h4><p class="text-sm text-slate-400">' + esc(p.name) + '</p></div></div>' +
                     '<div class="flex items-center gap-4"><span class="px-3 py-1 rounded-full text-xs ' + (rate >= 80 ? 'bg-green-500/20 text-green-300' : 'bg-amber-500/20 text-amber-300') + '">收款 ' + rate.toFixed(1) + '%</span>' +
                     '<button class="text-blue-400" data-edit-project="' + p.id + '">編輯</button>' +
                     '<button class="text-red-400" data-delete-project="' + p.id + '">刪除</button></div></div>' +
                     '<div class="p-4 grid grid-cols-5 gap-4">' +
-                    '<div><p class="text-xs text-slate-400">客戶</p><p>' + (p.customerName||'-') + '</p></div>' +
+                    '<div><p class="text-xs text-slate-400">客戶</p><p>' + esc(p.customerName||'-') + '</p></div>' +
                     '<div><p class="text-xs text-slate-400">訂單金額</p><p class="mono">' + fmt(p.orderAmount) + '</p></div>' +
                     '<div><p class="text-xs text-slate-400">佣金</p><p class="mono text-red-400">' + fmt(p.commission||0) + '</p></div>' +
                     '<div><p class="text-xs text-slate-400">成本×1.15</p><p class="mono text-amber-400">' + fmt(cost) + '</p></div>' +
@@ -1135,11 +1146,11 @@
             for (var j = 0; j < commList.length; j++) {
                 var comm = commList[j];
                 html += '<tr class="border-t border-slate-700 hover:bg-slate-800/50">' +
-                    '<td class="p-4">' + (comm.projectCode||'-') + '</td>' +
+                    '<td class="p-4">' + esc(comm.projectCode||'-') + '</td>' +
                     '<td class="p-4"><span class="px-2 py-1 rounded text-xs ' +
                     (comm.type === 'agent' ? 'bg-blue-500/20 text-blue-300' : comm.type === 'referral' ? 'bg-purple-500/20 text-purple-300' : 'bg-amber-500/20 text-amber-300') +
                     '">' + (COMM_TYPES[comm.type]||comm.type) + '</span></td>' +
-                    '<td class="p-4">' + (comm.description||'-') + '</td>' +
+                    '<td class="p-4">' + esc(comm.description||'-') + '</td>' +
                     '<td class="p-4 text-right mono text-red-400">' + fmt(comm.amount) + '</td>' +
                     '<td class="p-4">' + fmtDate(comm.date) + '</td>' +
                     '<td class="p-4">' +
@@ -1230,6 +1241,7 @@
                 for (var k = 0; k < commList.length; k++) {
                     if (commList[k].id === editId) {
                         oldProjectId = commList[k].projectId;
+                        commData.createdAt = commList[k].createdAt;
                         commList[k] = commData;
                         break;
                     }
@@ -1292,7 +1304,7 @@
                 var eligible = rate >= THRESHOLD && bonus > 0;
 
                 html += '<tr class="border-t border-slate-700">' +
-                    '<td class="p-4"><div class="font-medium">' + p.code + '</div><div class="text-xs text-slate-400">' + p.name + '</div></td>' +
+                    '<td class="p-4"><div class="font-medium">' + esc(p.code) + '</div><div class="text-xs text-slate-400">' + esc(p.name) + '</div></td>' +
                     '<td class="p-4 text-right mono">' + fmt(p.orderAmount) + '</td>' +
                     '<td class="p-4 text-right mono text-red-400">' + fmt(p.commission||0) + '</td>' +
                     '<td class="p-4 text-right mono text-amber-400">' + fmt(cost) + '</td>' +
@@ -1308,9 +1320,9 @@
         function loadSettings() {
             // Load company info from LocalStorage
             var company = getObj('company');
-            if (company.name) $('companyName').value = company.name;
-            if (company.contact) $('companyContact').value = company.contact;
-            if (company.phone) $('companyPhone').value = company.phone;
+            if (company.name !== undefined) $('companyName').value = company.name;
+            if (company.contact !== undefined) $('companyContact').value = company.contact;
+            if (company.phone !== undefined) $('companyPhone').value = company.phone;
 
             var customers = getData('customers');
             if (customers.length === 0) {
@@ -1321,7 +1333,7 @@
             var custHtml = '';
             for (var i = 0; i < customers.length; i++) {
                 var c = customers[i];
-                custHtml += '<div class="flex justify-between items-center py-2 border-b border-slate-700"><span>' + c.code + ' - ' + c.name + '</span><div>' +
+                custHtml += '<div class="flex justify-between items-center py-2 border-b border-slate-700"><span>' + esc(c.code) + ' - ' + esc(c.name) + '</span><div>' +
                     '<button class="text-blue-400 text-sm mr-2" data-edit-customer="' + c.code + '">編輯</button>' +
                     '<button class="text-red-400 text-sm" data-delete-customer="' + c.code + '">刪除</button></div></div>';
             }
@@ -1331,7 +1343,7 @@
             var supHtml = '';
             for (var j = 0; j < suppliers.length; j++) {
                 var s = suppliers[j];
-                supHtml += '<div class="flex justify-between items-center py-2 border-b border-slate-700"><span>' + s.code + ' - ' + s.name + '</span><div>' +
+                supHtml += '<div class="flex justify-between items-center py-2 border-b border-slate-700"><span>' + esc(s.code) + ' - ' + esc(s.name) + '</span><div>' +
                     '<button class="text-blue-400 text-sm mr-2" data-edit-supplier="' + s.code + '">編輯</button>' +
                     '<button class="text-red-400 text-sm" data-delete-supplier="' + s.code + '">刪除</button></div></div>';
             }
@@ -1549,6 +1561,7 @@
                 $('importPreview').classList.add('hidden');
                 $('btnImport').disabled = true;
                 $('importFileLabel').textContent = '點擊選擇 JSON 檔案';
+                $('importFile').value = '';
                 loadBackupPage();
                 toast('資料匯入成功！', 'success');
             });
