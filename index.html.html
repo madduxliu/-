@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智鐵機械財務管理系統 v1.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { font-family: 'Microsoft JhengHei', sans-serif; }
+        .mono { font-family: monospace; }
+        .sidebar { background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); }
+        .sidebar-item { transition: all 0.2s; border-left: 3px solid transparent; cursor: pointer; }
+        .sidebar-item:hover { background: rgba(59,130,246,0.1); border-left-color: #3b82f6; }
+        .sidebar-item.active { background: rgba(59,130,246,0.2); border-left-color: #3b82f6; }
+        .stat-card { background: linear-gradient(135deg, rgba(30,58,138,0.8) 0%, rgba(59,130,246,0.6) 100%); border: 1px solid rgba(255,255,255,0.1); }
+        .stat-card.danger { background: linear-gradient(135deg, rgba(220,38,38,0.8) 0%, rgba(239,68,68,0.6) 100%); }
+        .stat-card.success { background: linear-gradient(135deg, rgba(5,150,105,0.8) 0%, rgba(16,185,129,0.6) 100%); }
+        .data-table { background: rgba(30,41,59,0.5); border: 1px solid rgba(255,255,255,0.1); }
+        .input-field { background: #1e293b; border: 1px solid #334155; color: #f8fafc; }
+        .input-field:focus { border-color: #3b82f6; outline: none; }
+        .btn-primary { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; cursor: pointer; }
+        .btn-primary:hover { opacity: 0.9; }
+        .modal-overlay { background: rgba(0,0,0,0.7); }
+        .modal-content { background: #1e293b; border: 1px solid #334155; }
+        .page-content { display: none; }
+        .page-content.active { display: block; }
+        .tag-urgent { background: #ef4444; }
+        .tag-normal { background: #10b981; }
+        .toast { animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+    <div class="flex h-screen overflow-hidden">
+        <!-- 側邊欄 -->
+        <aside class="sidebar w-64 flex-shrink-0 flex flex-col">
+            <div class="p-4 border-b border-slate-700">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center"><span class="text-xl">🏭</span></div>
+                    <div><h1 class="font-bold text-lg">智鐵機械</h1><p class="text-xs text-slate-400">財務管理系統</p></div>
+                </div>
+                <div class="mt-3 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                    <span class="text-xs text-slate-400">本機版</span>
+                    <span class="text-xs text-slate-500 ml-auto mono">v1.0</span>
+                </div>
+            </div>
+            <nav class="flex-1 overflow-y-auto py-4">
+                <div class="px-3 mb-2"><span class="text-xs font-medium text-slate-500 uppercase">主要功能</span></div>
+                <div class="sidebar-item active flex items-center gap-3 px-4 py-3" data-page="dashboard">
+                    <span class="text-lg">📊</span><div><p class="font-medium">儀表板</p><p class="text-xs text-slate-400">總覽統計</p></div>
+                </div>
+                <div class="sidebar-item flex items-center gap-3 px-4 py-3" data-page="ar">
+                    <span class="text-lg">💰</span><div><p class="font-medium">應收帳款</p><p class="text-xs text-slate-400">收款追蹤</p></div>
+                </div>
+                <div class="sidebar-item flex items-center gap-3 px-4 py-3" data-page="ap">
+                    <span class="text-lg">📋</span><div><p class="font-medium">應付帳款</p><p class="text-xs text-slate-400">付款管理</p></div>
+                </div>
+                <div class="sidebar-item flex items-center gap-3 px-4 py-3" data-page="projects">
+                    <span class="text-lg">🏗️</span><div><p class="font-medium">工程專案</p><p class="text-xs text-slate-400">專案成本</p></div>
+                </div>
+                <div class="sidebar-item flex items-center gap-3 px-4 py-3" data-page="bonus">
+                    <span class="text-lg">🎁</span><div><p class="font-medium">獎金結算</p><p class="text-xs text-slate-400">訂單-佣金-成本×1.15</p></div>
+                </div>
+                <div class="px-3 my-4"><hr class="border-slate-700"></div>
+                <div class="px-3 mb-2"><span class="text-xs font-medium text-slate-500 uppercase">系統</span></div>
+                <div class="sidebar-item flex items-center gap-3 px-4 py-3" data-page="settings">
+                    <span class="text-lg">⚙️</span><div><p class="font-medium">系統設定</p><p class="text-xs text-slate-400">公司/客戶/供應商</p></div>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- 主內容區 -->
+        <main class="flex-1 overflow-y-auto bg-slate-900">
+            <!-- 儀表板 -->
+            <div id="page-dashboard" class="page-content active p-6">
+                <h2 class="text-2xl font-bold mb-6">📊 儀表板</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div class="stat-card rounded-xl p-4">
+                        <p class="text-sm text-slate-300">應收帳款總額</p>
+                        <p id="statArTotal" class="text-2xl font-bold mono">NT$ 0</p>
+                        <p class="text-xs text-slate-400"><span id="statArCount">0</span> 筆待收</p>
+                    </div>
+                    <div class="stat-card danger rounded-xl p-4">
+                        <p class="text-sm text-slate-300">逾期帳款</p>
+                        <p id="statOverdue" class="text-2xl font-bold mono">NT$ 0</p>
+                        <p class="text-xs text-slate-400"><span id="statOverdueCount">0</span> 筆逾期</p>
+                    </div>
+                    <div class="stat-card rounded-xl p-4">
+                        <p class="text-sm text-slate-300">應付帳款</p>
+                        <p id="statApTotal" class="text-2xl font-bold mono">NT$ 0</p>
+                        <p class="text-xs text-slate-400"><span id="statApCount">0</span> 筆待付</p>
+                    </div>
+                    <div class="stat-card success rounded-xl p-4">
+                        <p class="text-sm text-slate-300">可發放獎金</p>
+                        <p id="statBonus" class="text-2xl font-bold mono">NT$ 0</p>
+                        <p class="text-xs text-slate-400"><span id="statBonusCount">0</span> 個專案</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="data-table rounded-xl overflow-hidden">
+                        <div class="p-4 border-b border-slate-700"><h3 class="font-bold">進行中專案</h3></div>
+                        <div id="dashboardProjects" class="p-4 text-slate-400">載入中...</div>
+                    </div>
+                    <div class="data-table rounded-xl overflow-hidden">
+                        <div class="p-4 border-b border-slate-700"><h3 class="font-bold">近期到期帳款</h3></div>
+                        <div id="dashboardDue" class="p-4 text-slate-400">載入中...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 應收帳款 -->
+            <div id="page-ar" class="page-content p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">💰 應收帳款管理</h2>
+                    <button id="btnAddAr" class="btn-primary px-4 py-2 rounded-lg">+ 新增</button>
+                </div>
+                <div class="mb-4">
+                    <input type="text" id="arSearch" placeholder="搜尋..." class="input-field rounded-lg px-4 py-2 w-full max-w-md">
+                </div>
+                <div class="data-table rounded-xl overflow-hidden">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="text-left text-sm text-slate-400 border-b border-slate-700">
+                                <th class="p-4">專案</th><th class="p-4">客戶</th><th class="p-4">類型</th>
+                                <th class="p-4 text-right">應收</th><th class="p-4 text-right">已收</th>
+                                <th class="p-4">到期日</th><th class="p-4">狀態</th><th class="p-4">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="arTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 應付帳款 -->
+            <div id="page-ap" class="page-content p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">📋 應付帳款管理</h2>
+                    <button id="btnAddAp" class="btn-primary px-4 py-2 rounded-lg">+ 新增</button>
+                </div>
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="data-table rounded-xl p-4"><p class="text-sm text-slate-400">📝 支票</p><p id="apCheck" class="text-xl font-bold mono">NT$ 0</p></div>
+                    <div class="data-table rounded-xl p-4"><p class="text-sm text-slate-400">🏦 匯款</p><p id="apTransfer" class="text-xl font-bold mono">NT$ 0</p></div>
+                    <div class="data-table rounded-xl p-4"><p class="text-sm text-slate-400">💵 現金</p><p id="apCash" class="text-xl font-bold mono">NT$ 0</p></div>
+                </div>
+                <div class="data-table rounded-xl overflow-hidden">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="text-left text-sm text-slate-400 border-b border-slate-700">
+                                <th class="p-4">付款方式</th><th class="p-4">專案</th><th class="p-4">供應商</th>
+                                <th class="p-4 text-right">金額</th><th class="p-4">到期日</th><th class="p-4">狀態</th><th class="p-4">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="apTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 工程專案 -->
+            <div id="page-projects" class="page-content p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">🏗️ 工程專案管理</h2>
+                    <button id="btnAddProject" class="btn-primary px-4 py-2 rounded-lg">+ 新增專案</button>
+                </div>
+                <div class="bg-slate-800/50 rounded-lg p-4 mb-6">
+                    <p class="text-sm text-slate-400">💡 獎金公式：<span class="text-amber-400 mono">專案獎金 = 訂單金額 - 佣金 - (材料費 + 人工費) × 1.15</span></p>
+                </div>
+                <div id="projectList" class="space-y-4"></div>
+            </div>
+
+            <!-- 獎金結算 -->
+            <div id="page-bonus" class="page-content p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">🎁 獎金結算</h2>
+                    <button id="btnCalcBonus" class="btn-primary px-4 py-2 rounded-lg">🔄 重新計算</button>
+                </div>
+                <div class="bg-slate-800/50 rounded-lg p-4 mb-6">
+                    <p class="text-sm"><span class="text-slate-400">公式：</span><span class="text-amber-400 mono">獎金 = 訂單 - 佣金 - (材料+人工) × 1.15</span></p>
+                    <p class="text-sm mt-1"><span class="text-slate-400">發放條件：</span><span class="text-green-400">收款率 ≥ 80% 且 獎金 > 0</span></p>
+                </div>
+                <div class="data-table rounded-xl overflow-hidden">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="text-left text-sm text-slate-400 border-b border-slate-700">
+                                <th class="p-4">專案</th><th class="p-4 text-right">訂單</th><th class="p-4 text-right">佣金</th>
+                                <th class="p-4 text-right">成本×1.15</th><th class="p-4 text-right">獎金</th>
+                                <th class="p-4 text-center">收款率</th><th class="p-4">狀態</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bonusTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 系統設定 -->
+            <div id="page-settings" class="page-content p-6">
+                <h2 class="text-2xl font-bold mb-6">⚙️ 系統設定</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="data-table rounded-xl p-6">
+                        <h3 class="font-bold text-lg mb-4">公司資訊</h3>
+                        <div class="space-y-4">
+                            <div><label class="block text-sm text-slate-400 mb-1">公司名稱</label><input type="text" id="companyName" class="input-field w-full rounded-lg px-4 py-2" value="智鐵機械工程有限公司"></div>
+                            <div><label class="block text-sm text-slate-400 mb-1">聯絡人</label><input type="text" id="companyContact" class="input-field w-full rounded-lg px-4 py-2" value="王智彥"></div>
+                            <div><label class="block text-sm text-slate-400 mb-1">電話</label><input type="text" id="companyPhone" class="input-field w-full rounded-lg px-4 py-2" value="03-4691369"></div>
+                            <button id="btnSaveCompany" class="btn-primary px-4 py-2 rounded-lg w-full">儲存</button>
+                        </div>
+                    </div>
+                    <div class="data-table rounded-xl p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-lg">客戶列表</h3>
+                            <button id="btnAddCustomer" class="text-blue-400 hover:text-blue-300">+ 新增</button>
+                        </div>
+                        <div id="customerList" class="space-y-2"></div>
+                    </div>
+                    <div class="data-table rounded-xl p-6 lg:col-span-2">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-lg">供應商列表</h3>
+                            <button id="btnAddSupplier" class="text-blue-400 hover:text-blue-300">+ 新增</button>
+                        </div>
+                        <div id="supplierList" class="space-y-2"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+    <!-- Modal -->
+    <div id="modalContainer"></div>
+
+    <script>
+    // ============================================================
+    // 智鐵機械財務管理系統 v1.0
+    // ============================================================
+    (function() {
+        'use strict';
+        
+        var VERSION = '1.0';
+        var FACTOR = 1.15;
+        var THRESHOLD = 80;
+        
+        // 預設資料
+        var DEFAULT_CUSTOMERS = [
+            {code:'C001', name:'國瑞汽車股份有限公司', shortName:'國瑞汽車'},
+            {code:'C002', name:'長新國際工程有限公司', shortName:'長新國際'},
+            {code:'C003', name:'長聖儀器股份有限公司', shortName:'長聖儀器'}
+        ];
+        
+        var AR_TYPES = {deposit:'訂金', delivery:'進場款', acceptance:'驗收款', final:'尾款'};
+        var PM_TYPES = {CHECK:'支票', TRANSFER:'匯款', CASH:'現金'};
+        
+        // ============== 工具函數 ==============
+        function $(id) { return document.getElementById(id); }
+        function $$(sel) { return document.querySelectorAll(sel); }
+        function fmt(n) { return 'NT$ ' + (n||0).toLocaleString(); }
+        function fmtDate(d) { return d ? new Date(d).toLocaleDateString('zh-TW') : '-'; }
+        function genId(p) { return (p||'id') + '_' + Date.now() + '_' + Math.random().toString(36).substr(2,4); }
+        
+        function getData(k) {
+            try { return JSON.parse(localStorage.getItem('zt_'+k)) || []; }
+            catch(e) { return []; }
+        }
+        function setData(k, v) {
+            localStorage.setItem('zt_'+k, JSON.stringify(v));
+        }
+        
+        function toast(msg, type) {
+            var c = $('toastContainer');
+            var colors = {success:'bg-green-600', error:'bg-red-600', info:'bg-blue-600'};
+            var t = document.createElement('div');
+            t.className = 'toast ' + (colors[type]||colors.info) + ' px-4 py-3 rounded-lg shadow-lg text-white';
+            t.textContent = msg;
+            c.appendChild(t);
+            setTimeout(function(){ t.remove(); }, 3000);
+        }
+        
+        function closeModal() {
+            $('modalContainer').innerHTML = '';
+        }
+        
+        // ============== 頁面切換 ==============
+        function showPage(pageId) {
+            console.log('切換頁面:', pageId);
+            
+            // 隱藏所有頁面
+            var pages = $$('.page-content');
+            for (var i = 0; i < pages.length; i++) {
+                pages[i].classList.remove('active');
+            }
+            
+            // 顯示目標頁面
+            var target = $('page-' + pageId);
+            if (target) target.classList.add('active');
+            
+            // 更新側邊欄
+            var items = $$('.sidebar-item');
+            for (var j = 0; j < items.length; j++) {
+                items[j].classList.remove('active');
+                if (items[j].getAttribute('data-page') === pageId) {
+                    items[j].classList.add('active');
+                }
+            }
+            
+            // 載入資料
+            switch(pageId) {
+                case 'dashboard': loadDashboard(); break;
+                case 'ar': loadArList(); break;
+                case 'ap': loadApList(); break;
+                case 'projects': loadProjectList(); break;
+                case 'bonus': loadBonusList(); break;
+                case 'settings': loadSettings(); break;
+            }
+        }
+        
+        // ============== 儀表板 ==============
+        function loadDashboard() {
+            var arList = getData('ar');
+            var apList = getData('ap');
+            var projects = getData('projects');
+            
+            var arTotal = 0, arCount = 0, overdueTotal = 0, overdueCount = 0;
+            var now = new Date();
+            
+            for (var i = 0; i < arList.length; i++) {
+                var ar = arList[i];
+                arTotal += ar.amount || 0;
+                var paid = ar.paidAmount || 0;
+                if (paid < ar.amount) {
+                    arCount++;
+                    if (new Date(ar.dueDate) < now) {
+                        overdueTotal += ar.amount - paid;
+                        overdueCount++;
+                    }
+                }
+            }
+            
+            var apTotal = 0, apCount = 0;
+            for (var j = 0; j < apList.length; j++) {
+                if (apList[j].status !== 'paid') {
+                    apTotal += apList[j].amount || 0;
+                    apCount++;
+                }
+            }
+            
+            var bonusTotal = 0, bonusCount = 0;
+            for (var k = 0; k < projects.length; k++) {
+                var p = projects[k];
+                var cost = ((p.materialCost||0) + (p.laborCost||0)) * FACTOR;
+                var bonus = (p.orderAmount||0) - (p.commission||0) - cost;
+                if ((p.collectionRate||0) >= THRESHOLD && bonus > 0) {
+                    bonusTotal += bonus;
+                    bonusCount++;
+                }
+            }
+            
+            $('statArTotal').textContent = fmt(arTotal);
+            $('statArCount').textContent = arCount;
+            $('statOverdue').textContent = fmt(overdueTotal);
+            $('statOverdueCount').textContent = overdueCount;
+            $('statApTotal').textContent = fmt(apTotal);
+            $('statApCount').textContent = apCount;
+            $('statBonus').textContent = fmt(bonusTotal);
+            $('statBonusCount').textContent = bonusCount;
+            
+            // 專案列表
+            var projHtml = '';
+            if (projects.length === 0) {
+                projHtml = '<p class="text-slate-400">尚無專案</p>';
+            } else {
+                for (var m = 0; m < Math.min(5, projects.length); m++) {
+                    var proj = projects[m];
+                    projHtml += '<div class="flex justify-between py-2 border-b border-slate-700"><span>' + proj.code + ' ' + proj.name + '</span><span class="text-amber-400">' + (proj.collectionRate||0).toFixed(1) + '%</span></div>';
+                }
+            }
+            $('dashboardProjects').innerHTML = projHtml;
+            
+            // 近期到期
+            var pending = arList.filter(function(a) { return (a.paidAmount||0) < a.amount; });
+            pending.sort(function(a,b) { return new Date(a.dueDate) - new Date(b.dueDate); });
+            var dueHtml = '';
+            if (pending.length === 0) {
+                dueHtml = '<p class="text-slate-400">無待收帳款</p>';
+            } else {
+                for (var n = 0; n < Math.min(5, pending.length); n++) {
+                    var ar2 = pending[n];
+                    dueHtml += '<div class="flex justify-between py-2 border-b border-slate-700"><span>' + (ar2.projectCode||'-') + '</span><span class="mono">' + fmt(ar2.amount - (ar2.paidAmount||0)) + '</span><span>' + fmtDate(ar2.dueDate) + '</span></div>';
+                }
+            }
+            $('dashboardDue').innerHTML = dueHtml;
+        }
+        
+        // ============== 應收帳款 ==============
+        function loadArList() {
+            var arList = getData('ar');
+            var tbody = $('arTableBody');
+            
+            if (arList.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400">暫無應收帳款，點擊「新增」建立</td></tr>';
+                return;
+            }
+            
+            var html = '';
+            var now = new Date();
+            for (var i = 0; i < arList.length; i++) {
+                var ar = arList[i];
+                var paid = ar.paidAmount || 0;
+                var status, statusCls;
+                if (paid >= ar.amount) { status = '已入帳'; statusCls = 'bg-green-500/20 text-green-300'; }
+                else if (new Date(ar.dueDate) < now) { status = '逾期'; statusCls = 'bg-red-500/20 text-red-300'; }
+                else if (paid > 0) { status = '部分收款'; statusCls = 'bg-amber-500/20 text-amber-300'; }
+                else { status = '待收款'; statusCls = 'bg-blue-500/20 text-blue-300'; }
+                
+                html += '<tr class="border-t border-slate-700 hover:bg-slate-800/50">' +
+                    '<td class="p-4">' + (ar.projectCode||'-') + '</td>' +
+                    '<td class="p-4">' + (ar.customerName||'-') + '</td>' +
+                    '<td class="p-4">' + (AR_TYPES[ar.type]||ar.type) + '</td>' +
+                    '<td class="p-4 text-right mono">' + fmt(ar.amount) + '</td>' +
+                    '<td class="p-4 text-right mono text-green-400">' + fmt(paid) + '</td>' +
+                    '<td class="p-4">' + fmtDate(ar.dueDate) + '</td>' +
+                    '<td class="p-4"><span class="px-2 py-1 rounded text-xs ' + statusCls + '">' + status + '</span></td>' +
+                    '<td class="p-4"><button class="text-blue-400 mr-2" data-edit-ar="' + ar.id + '">編輯</button>' +
+                    '<button class="text-green-400" data-pay-ar="' + ar.id + '">收款</button></td></tr>';
+            }
+            tbody.innerHTML = html;
+        }
+        
+        function openArModal(editId) {
+            var arList = getData('ar');
+            var customers = getData('customers');
+            if (customers.length === 0) customers = DEFAULT_CUSTOMERS;
+            var projects = getData('projects');
+            
+            var ar = null;
+            if (editId) {
+                for (var i = 0; i < arList.length; i++) {
+                    if (arList[i].id === editId) { ar = arList[i]; break; }
+                }
+            }
+            
+            var projOpts = '<option value="">選擇專案</option>';
+            for (var p = 0; p < projects.length; p++) {
+                var sel = (ar && ar.projectId === projects[p].id) ? ' selected' : '';
+                projOpts += '<option value="' + projects[p].id + '"' + sel + '>' + projects[p].code + '</option>';
+            }
+            
+            var custOpts = '<option value="">選擇客戶</option>';
+            for (var c = 0; c < customers.length; c++) {
+                var csel = (ar && ar.customerCode === customers[c].code) ? ' selected' : '';
+                custOpts += '<option value="' + customers[c].code + '"' + csel + '>' + (customers[c].shortName||customers[c].name) + '</option>';
+            }
+            
+            var typeOpts = '';
+            for (var t in AR_TYPES) {
+                var tsel = (ar && ar.type === t) ? ' selected' : '';
+                typeOpts += '<option value="' + t + '"' + tsel + '>' + AR_TYPES[t] + '</option>';
+            }
+            
+            var html = '<div class="fixed inset-0 modal-overlay flex items-center justify-center z-50">' +
+                '<div class="modal-content rounded-xl w-full max-w-lg p-6 m-4">' +
+                '<h3 class="text-xl font-bold mb-6">' + (ar ? '編輯' : '新增') + '應收帳款</h3>' +
+                '<div class="space-y-4">' +
+                '<div class="grid grid-cols-2 gap-4">' +
+                '<div><label class="block text-sm text-slate-400 mb-1">專案</label><select id="mArProject" class="input-field w-full rounded-lg px-4 py-2">' + projOpts + '</select></div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">客戶</label><select id="mArCustomer" class="input-field w-full rounded-lg px-4 py-2">' + custOpts + '</select></div>' +
+                '</div>' +
+                '<div class="grid grid-cols-2 gap-4">' +
+                '<div><label class="block text-sm text-slate-400 mb-1">類型</label><select id="mArType" class="input-field w-full rounded-lg px-4 py-2">' + typeOpts + '</select></div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">金額</label><input type="number" id="mArAmount" class="input-field w-full rounded-lg px-4 py-2" value="' + (ar ? ar.amount : '') + '"></div>' +
+                '</div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">預計收款日</label><input type="date" id="mArDueDate" class="input-field w-full rounded-lg px-4 py-2" value="' + (ar ? ar.dueDate : '') + '"></div>' +
+                '<div class="flex justify-end gap-2 mt-6">' +
+                '<button id="mArCancel" class="px-4 py-2 rounded-lg bg-slate-700">取消</button>' +
+                '<button id="mArSave" class="btn-primary px-4 py-2 rounded-lg" data-id="' + (ar ? ar.id : '') + '">儲存</button>' +
+                '</div></div></div></div>';
+            
+            $('modalContainer').innerHTML = html;
+            
+            $('mArCancel').onclick = closeModal;
+            $('mArSave').onclick = function() {
+                var id = this.getAttribute('data-id');
+                saveAr(id);
+            };
+        }
+        
+        function saveAr(editId) {
+            var projects = getData('projects');
+            var customers = getData('customers');
+            if (customers.length === 0) customers = DEFAULT_CUSTOMERS;
+            
+            var projId = $('mArProject').value;
+            var custCode = $('mArCustomer').value;
+            var project = null, customer = null;
+            
+            for (var i = 0; i < projects.length; i++) {
+                if (projects[i].id === projId) { project = projects[i]; break; }
+            }
+            for (var j = 0; j < customers.length; j++) {
+                if (customers[j].code === custCode) { customer = customers[j]; break; }
+            }
+            
+            var arData = {
+                id: editId || genId('ar'),
+                projectId: project ? project.id : null,
+                projectCode: project ? project.code : '',
+                customerCode: customer ? customer.code : '',
+                customerName: customer ? (customer.shortName || customer.name) : '',
+                type: $('mArType').value,
+                amount: parseFloat($('mArAmount').value) || 0,
+                paidAmount: 0,
+                dueDate: $('mArDueDate').value,
+                createdAt: new Date().toISOString()
+            };
+            
+            var arList = getData('ar');
+            if (editId) {
+                for (var k = 0; k < arList.length; k++) {
+                    if (arList[k].id === editId) {
+                        arData.paidAmount = arList[k].paidAmount || 0;
+                        arData.createdAt = arList[k].createdAt;
+                        arList[k] = arData;
+                        break;
+                    }
+                }
+            } else {
+                arList.push(arData);
+            }
+            
+            setData('ar', arList);
+            closeModal();
+            loadArList();
+            toast('已儲存', 'success');
+        }
+        
+        function openPayArModal(id) {
+            var arList = getData('ar');
+            var ar = null;
+            for (var i = 0; i < arList.length; i++) {
+                if (arList[i].id === id) { ar = arList[i]; break; }
+            }
+            if (!ar) return;
+            
+            var remaining = ar.amount - (ar.paidAmount || 0);
+            
+            var html = '<div class="fixed inset-0 modal-overlay flex items-center justify-center z-50">' +
+                '<div class="modal-content rounded-xl w-full max-w-md p-6 m-4">' +
+                '<h3 class="text-xl font-bold mb-6">記錄收款</h3>' +
+                '<div class="mb-4 p-4 bg-slate-800 rounded-lg">' +
+                '<p class="text-slate-400">專案：<span class="text-white">' + (ar.projectCode||'-') + '</span></p>' +
+                '<p class="text-slate-400">待收：<span class="text-amber-400 mono">' + fmt(remaining) + '</span></p></div>' +
+                '<div class="mb-4"><label class="block text-sm text-slate-400 mb-1">本次收款金額</label>' +
+                '<input type="number" id="mPayAmount" class="input-field w-full rounded-lg px-4 py-2" value="' + remaining + '"></div>' +
+                '<div class="flex justify-end gap-2">' +
+                '<button id="mPayCancel" class="px-4 py-2 rounded-lg bg-slate-700">取消</button>' +
+                '<button id="mPayConfirm" class="btn-primary px-4 py-2 rounded-lg" data-id="' + id + '">確認收款</button>' +
+                '</div></div></div>';
+            
+            $('modalContainer').innerHTML = html;
+            $('mPayCancel').onclick = closeModal;
+            $('mPayConfirm').onclick = function() {
+                var arId = this.getAttribute('data-id');
+                var amount = parseFloat($('mPayAmount').value) || 0;
+                var list = getData('ar');
+                for (var i = 0; i < list.length; i++) {
+                    if (list[i].id === arId) {
+                        list[i].paidAmount = (list[i].paidAmount || 0) + amount;
+                        break;
+                    }
+                }
+                setData('ar', list);
+                closeModal();
+                loadArList();
+                toast('已收款 ' + fmt(amount), 'success');
+            };
+        }
+        
+        // ============== 應付帳款 ==============
+        function loadApList() {
+            var apList = getData('ap');
+            
+            var checkTotal = 0, transferTotal = 0, cashTotal = 0;
+            for (var i = 0; i < apList.length; i++) {
+                var ap = apList[i];
+                if (ap.status !== 'paid') {
+                    if (ap.paymentType === 'CHECK') checkTotal += ap.amount || 0;
+                    else if (ap.paymentType === 'TRANSFER') transferTotal += ap.amount || 0;
+                    else if (ap.paymentType === 'CASH') cashTotal += ap.amount || 0;
+                }
+            }
+            
+            $('apCheck').textContent = fmt(checkTotal);
+            $('apTransfer').textContent = fmt(transferTotal);
+            $('apCash').textContent = fmt(cashTotal);
+            
+            var tbody = $('apTableBody');
+            if (apList.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400">暫無應付帳款</td></tr>';
+                return;
+            }
+            
+            var html = '';
+            for (var j = 0; j < apList.length; j++) {
+                var ap = apList[j];
+                var status = ap.status === 'paid' ? '已付款' : '待付款';
+                var statusCls = ap.status === 'paid' ? 'bg-green-500/20 text-green-300' : 'bg-amber-500/20 text-amber-300';
+                
+                html += '<tr class="border-t border-slate-700 hover:bg-slate-800/50">' +
+                    '<td class="p-4">' + (PM_TYPES[ap.paymentType]||ap.paymentType) + '</td>' +
+                    '<td class="p-4">' + (ap.projectCode||'-') + '</td>' +
+                    '<td class="p-4">' + (ap.vendorName||'-') + '</td>' +
+                    '<td class="p-4 text-right mono">' + fmt(ap.amount) + '</td>' +
+                    '<td class="p-4">' + fmtDate(ap.dueDate) + '</td>' +
+                    '<td class="p-4"><span class="px-2 py-1 rounded text-xs ' + statusCls + '">' + status + '</span></td>' +
+                    '<td class="p-4"><button class="text-blue-400 mr-2" data-edit-ap="' + ap.id + '">編輯</button>' +
+                    (ap.status !== 'paid' ? '<button class="text-green-400" data-pay-ap="' + ap.id + '">付款</button>' : '') + '</td></tr>';
+            }
+            tbody.innerHTML = html;
+        }
+        
+        function openApModal(editId) {
+            var apList = getData('ap');
+            var projects = getData('projects');
+            var suppliers = getData('suppliers');
+            
+            var ap = null;
+            if (editId) {
+                for (var i = 0; i < apList.length; i++) {
+                    if (apList[i].id === editId) { ap = apList[i]; break; }
+                }
+            }
+            
+            var projOpts = '<option value="">無</option>';
+            for (var p = 0; p < projects.length; p++) {
+                var sel = (ap && ap.projectId === projects[p].id) ? ' selected' : '';
+                projOpts += '<option value="' + projects[p].id + '"' + sel + '>' + projects[p].code + '</option>';
+            }
+            
+            var supOpts = '<option value="">選擇供應商</option>';
+            for (var s = 0; s < suppliers.length; s++) {
+                var ssel = (ap && ap.vendorCode === suppliers[s].code) ? ' selected' : '';
+                supOpts += '<option value="' + suppliers[s].code + '"' + ssel + '>' + suppliers[s].name + '</option>';
+            }
+            
+            var pmOpts = '';
+            for (var t in PM_TYPES) {
+                var tsel = (ap && ap.paymentType === t) ? ' selected' : '';
+                pmOpts += '<option value="' + t + '"' + tsel + '>' + PM_TYPES[t] + '</option>';
+            }
+            
+            var html = '<div class="fixed inset-0 modal-overlay flex items-center justify-center z-50">' +
+                '<div class="modal-content rounded-xl w-full max-w-lg p-6 m-4">' +
+                '<h3 class="text-xl font-bold mb-6">' + (ap ? '編輯' : '新增') + '應付帳款</h3>' +
+                '<div class="space-y-4">' +
+                '<div class="grid grid-cols-2 gap-4">' +
+                '<div><label class="block text-sm text-slate-400 mb-1">專案</label><select id="mApProject" class="input-field w-full rounded-lg px-4 py-2">' + projOpts + '</select></div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">供應商</label><select id="mApVendor" class="input-field w-full rounded-lg px-4 py-2">' + supOpts + '</select></div>' +
+                '</div>' +
+                '<div class="grid grid-cols-2 gap-4">' +
+                '<div><label class="block text-sm text-slate-400 mb-1">付款方式</label><select id="mApType" class="input-field w-full rounded-lg px-4 py-2">' + pmOpts + '</select></div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">金額</label><input type="number" id="mApAmount" class="input-field w-full rounded-lg px-4 py-2" value="' + (ap ? ap.amount : '') + '"></div>' +
+                '</div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">到期日</label><input type="date" id="mApDueDate" class="input-field w-full rounded-lg px-4 py-2" value="' + (ap ? ap.dueDate : '') + '"></div>' +
+                '<div class="flex justify-end gap-2 mt-6">' +
+                '<button id="mApCancel" class="px-4 py-2 rounded-lg bg-slate-700">取消</button>' +
+                '<button id="mApSave" class="btn-primary px-4 py-2 rounded-lg" data-id="' + (ap ? ap.id : '') + '">儲存</button>' +
+                '</div></div></div></div>';
+            
+            $('modalContainer').innerHTML = html;
+            $('mApCancel').onclick = closeModal;
+            $('mApSave').onclick = function() {
+                var id = this.getAttribute('data-id');
+                saveAp(id);
+            };
+        }
+        
+        function saveAp(editId) {
+            var projects = getData('projects');
+            var suppliers = getData('suppliers');
+            
+            var projId = $('mApProject').value;
+            var vendorCode = $('mApVendor').value;
+            var project = null, vendor = null;
+            
+            for (var i = 0; i < projects.length; i++) {
+                if (projects[i].id === projId) { project = projects[i]; break; }
+            }
+            for (var j = 0; j < suppliers.length; j++) {
+                if (suppliers[j].code === vendorCode) { vendor = suppliers[j]; break; }
+            }
+            
+            var apData = {
+                id: editId || genId('ap'),
+                projectId: project ? project.id : null,
+                projectCode: project ? project.code : '',
+                vendorCode: vendor ? vendor.code : '',
+                vendorName: vendor ? vendor.name : '',
+                paymentType: $('mApType').value,
+                amount: parseFloat($('mApAmount').value) || 0,
+                dueDate: $('mApDueDate').value,
+                status: 'pending',
+                createdAt: new Date().toISOString()
+            };
+            
+            var apList = getData('ap');
+            if (editId) {
+                for (var k = 0; k < apList.length; k++) {
+                    if (apList[k].id === editId) {
+                        apData.status = apList[k].status;
+                        apList[k] = apData;
+                        break;
+                    }
+                }
+            } else {
+                apList.push(apData);
+            }
+            
+            setData('ap', apList);
+            closeModal();
+            loadApList();
+            toast('已儲存', 'success');
+        }
+        
+        function markApPaid(id) {
+            var apList = getData('ap');
+            for (var i = 0; i < apList.length; i++) {
+                if (apList[i].id === id) {
+                    apList[i].status = 'paid';
+                    break;
+                }
+            }
+            setData('ap', apList);
+            loadApList();
+            toast('已標記付款', 'success');
+        }
+        
+        // ============== 工程專案 ==============
+        function loadProjectList() {
+            var projects = getData('projects');
+            var container = $('projectList');
+            
+            if (projects.length === 0) {
+                container.innerHTML = '<div class="data-table rounded-xl p-8 text-center text-slate-400">暫無專案，點擊「新增專案」建立</div>';
+                return;
+            }
+            
+            var html = '';
+            for (var i = 0; i < projects.length; i++) {
+                var p = projects[i];
+                var cost = ((p.materialCost||0) + (p.laborCost||0)) * FACTOR;
+                var bonus = (p.orderAmount||0) - (p.commission||0) - cost;
+                var rate = p.collectionRate || 0;
+                
+                html += '<div class="data-table rounded-xl overflow-hidden">' +
+                    '<div class="p-4 border-b border-slate-700 flex justify-between items-center">' +
+                    '<div class="flex items-center gap-3"><span class="text-2xl">🏗️</span><div><h4 class="font-bold">' + p.code + '</h4><p class="text-sm text-slate-400">' + p.name + '</p></div></div>' +
+                    '<div class="flex items-center gap-4"><span class="px-3 py-1 rounded-full text-xs ' + (rate >= 80 ? 'bg-green-500/20 text-green-300' : 'bg-amber-500/20 text-amber-300') + '">收款 ' + rate.toFixed(1) + '%</span>' +
+                    '<button class="text-blue-400" data-edit-project="' + p.id + '">編輯</button></div></div>' +
+                    '<div class="p-4 grid grid-cols-4 gap-4">' +
+                    '<div><p class="text-xs text-slate-400">客戶</p><p>' + (p.customerName||'-') + '</p></div>' +
+                    '<div><p class="text-xs text-slate-400">訂單金額</p><p class="mono">' + fmt(p.orderAmount) + '</p></div>' +
+                    '<div><p class="text-xs text-slate-400">成本×1.15</p><p class="mono text-amber-400">' + fmt(cost) + '</p></div>' +
+                    '<div><p class="text-xs text-slate-400">獎金</p><p class="mono ' + (bonus >= 0 ? 'text-green-400' : 'text-red-400') + '">' + fmt(bonus) + '</p></div>' +
+                    '</div></div>';
+            }
+            container.innerHTML = html;
+        }
+        
+        function openProjectModal(editId) {
+            var projects = getData('projects');
+            var customers = getData('customers');
+            if (customers.length === 0) customers = DEFAULT_CUSTOMERS;
+            
+            var project = null;
+            if (editId) {
+                for (var i = 0; i < projects.length; i++) {
+                    if (projects[i].id === editId) { project = projects[i]; break; }
+                }
+            }
+            
+            var custOpts = '<option value="">選擇客戶</option>';
+            for (var c = 0; c < customers.length; c++) {
+                var sel = (project && project.customerCode === customers[c].code) ? ' selected' : '';
+                custOpts += '<option value="' + customers[c].code + '"' + sel + '>' + (customers[c].shortName||customers[c].name) + '</option>';
+            }
+            
+            var code = project ? project.code : 'ZT-' + new Date().getFullYear() + '-' + String(projects.length + 1).padStart(3, '0');
+            
+            var html = '<div class="fixed inset-0 modal-overlay flex items-center justify-center z-50">' +
+                '<div class="modal-content rounded-xl w-full max-w-2xl p-6 m-4">' +
+                '<h3 class="text-xl font-bold mb-6">' + (project ? '編輯' : '新增') + '工程專案</h3>' +
+                '<div class="space-y-4">' +
+                '<div class="grid grid-cols-2 gap-4">' +
+                '<div><label class="block text-sm text-slate-400 mb-1">專案代號</label><input type="text" id="mProjCode" class="input-field w-full rounded-lg px-4 py-2" value="' + code + '"></div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">客戶</label><select id="mProjCustomer" class="input-field w-full rounded-lg px-4 py-2">' + custOpts + '</select></div>' +
+                '</div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">專案名稱</label><input type="text" id="mProjName" class="input-field w-full rounded-lg px-4 py-2" value="' + (project ? project.name : '') + '"></div>' +
+                '<div class="grid grid-cols-3 gap-4">' +
+                '<div><label class="block text-sm text-slate-400 mb-1">訂單金額</label><input type="number" id="mProjOrder" class="input-field w-full rounded-lg px-4 py-2" value="' + (project ? project.orderAmount : '') + '"></div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">材料費</label><input type="number" id="mProjMaterial" class="input-field w-full rounded-lg px-4 py-2" value="' + (project ? project.materialCost||0 : 0) + '"></div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">人工費</label><input type="number" id="mProjLabor" class="input-field w-full rounded-lg px-4 py-2" value="' + (project ? project.laborCost||0 : 0) + '"></div>' +
+                '</div>' +
+                '<div class="flex justify-end gap-2 mt-6">' +
+                '<button id="mProjCancel" class="px-4 py-2 rounded-lg bg-slate-700">取消</button>' +
+                '<button id="mProjSave" class="btn-primary px-4 py-2 rounded-lg" data-id="' + (project ? project.id : '') + '">儲存</button>' +
+                '</div></div></div></div>';
+            
+            $('modalContainer').innerHTML = html;
+            $('mProjCancel').onclick = closeModal;
+            $('mProjSave').onclick = function() {
+                var id = this.getAttribute('data-id');
+                saveProject(id);
+            };
+        }
+        
+        function saveProject(editId) {
+            var customers = getData('customers');
+            if (customers.length === 0) customers = DEFAULT_CUSTOMERS;
+            
+            var custCode = $('mProjCustomer').value;
+            var customer = null;
+            for (var i = 0; i < customers.length; i++) {
+                if (customers[i].code === custCode) { customer = customers[i]; break; }
+            }
+            
+            var projData = {
+                id: editId || genId('pj'),
+                code: $('mProjCode').value,
+                name: $('mProjName').value,
+                customerCode: customer ? customer.code : '',
+                customerName: customer ? (customer.shortName || customer.name) : '',
+                orderAmount: parseFloat($('mProjOrder').value) || 0,
+                materialCost: parseFloat($('mProjMaterial').value) || 0,
+                laborCost: parseFloat($('mProjLabor').value) || 0,
+                commission: 0,
+                collectionRate: 0,
+                createdAt: new Date().toISOString()
+            };
+            
+            var projects = getData('projects');
+            if (editId) {
+                for (var j = 0; j < projects.length; j++) {
+                    if (projects[j].id === editId) {
+                        projData.commission = projects[j].commission || 0;
+                        projData.collectionRate = projects[j].collectionRate || 0;
+                        projects[j] = projData;
+                        break;
+                    }
+                }
+            } else {
+                projects.push(projData);
+            }
+            
+            setData('projects', projects);
+            closeModal();
+            loadProjectList();
+            toast('已儲存', 'success');
+        }
+        
+        // ============== 獎金結算 ==============
+        function loadBonusList() {
+            var projects = getData('projects');
+            var tbody = $('bonusTableBody');
+            
+            if (projects.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400">暫無專案資料</td></tr>';
+                return;
+            }
+            
+            var html = '';
+            for (var i = 0; i < projects.length; i++) {
+                var p = projects[i];
+                var cost = ((p.materialCost||0) + (p.laborCost||0)) * FACTOR;
+                var bonus = (p.orderAmount||0) - (p.commission||0) - cost;
+                var rate = p.collectionRate || 0;
+                var eligible = rate >= THRESHOLD && bonus > 0;
+                
+                html += '<tr class="border-t border-slate-700">' +
+                    '<td class="p-4"><div class="font-medium">' + p.code + '</div><div class="text-xs text-slate-400">' + p.name + '</div></td>' +
+                    '<td class="p-4 text-right mono">' + fmt(p.orderAmount) + '</td>' +
+                    '<td class="p-4 text-right mono text-red-400">' + fmt(p.commission||0) + '</td>' +
+                    '<td class="p-4 text-right mono text-amber-400">' + fmt(cost) + '</td>' +
+                    '<td class="p-4 text-right mono ' + (bonus >= 0 ? 'text-green-400' : 'text-red-400') + '">' + fmt(bonus) + '</td>' +
+                    '<td class="p-4 text-center"><span class="px-2 py-1 rounded ' + (rate >= THRESHOLD ? 'bg-green-500/20 text-green-300' : 'bg-amber-500/20 text-amber-300') + '">' + rate.toFixed(1) + '%</span></td>' +
+                    '<td class="p-4">' + (eligible ? '<span class="text-green-400">✓ 可發放</span>' : '<span class="text-slate-400">未達標</span>') + '</td>' +
+                    '</tr>';
+            }
+            tbody.innerHTML = html;
+        }
+        
+        // ============== 設定 ==============
+        function loadSettings() {
+            var customers = getData('customers');
+            if (customers.length === 0) {
+                customers = DEFAULT_CUSTOMERS;
+                setData('customers', customers);
+            }
+            
+            var custHtml = '';
+            for (var i = 0; i < customers.length; i++) {
+                var c = customers[i];
+                custHtml += '<div class="flex justify-between items-center py-2 border-b border-slate-700"><span>' + c.code + ' - ' + c.name + '</span><button class="text-blue-400 text-sm" data-edit-customer="' + c.code + '">編輯</button></div>';
+            }
+            $('customerList').innerHTML = custHtml || '<p class="text-slate-400">無客戶資料</p>';
+            
+            var suppliers = getData('suppliers');
+            var supHtml = '';
+            for (var j = 0; j < suppliers.length; j++) {
+                var s = suppliers[j];
+                supHtml += '<div class="flex justify-between items-center py-2 border-b border-slate-700"><span>' + s.code + ' - ' + s.name + '</span><button class="text-blue-400 text-sm" data-edit-supplier="' + s.code + '">編輯</button></div>';
+            }
+            $('supplierList').innerHTML = supHtml || '<p class="text-slate-400">無供應商資料，請新增</p>';
+        }
+        
+        function openCustomerModal(editCode) {
+            var customers = getData('customers');
+            var cust = null;
+            if (editCode) {
+                for (var i = 0; i < customers.length; i++) {
+                    if (customers[i].code === editCode) { cust = customers[i]; break; }
+                }
+            }
+            
+            var html = '<div class="fixed inset-0 modal-overlay flex items-center justify-center z-50">' +
+                '<div class="modal-content rounded-xl w-full max-w-md p-6 m-4">' +
+                '<h3 class="text-xl font-bold mb-6">' + (cust ? '編輯' : '新增') + '客戶</h3>' +
+                '<div class="space-y-4">' +
+                '<div><label class="block text-sm text-slate-400 mb-1">代碼</label><input type="text" id="mCustCode" class="input-field w-full rounded-lg px-4 py-2" value="' + (cust ? cust.code : 'C' + String(customers.length + 1).padStart(3, '0')) + '"' + (cust ? ' readonly' : '') + '></div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">名稱</label><input type="text" id="mCustName" class="input-field w-full rounded-lg px-4 py-2" value="' + (cust ? cust.name : '') + '"></div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">簡稱</label><input type="text" id="mCustShort" class="input-field w-full rounded-lg px-4 py-2" value="' + (cust ? cust.shortName||'' : '') + '"></div>' +
+                '<div class="flex justify-end gap-2 mt-6">' +
+                '<button id="mCustCancel" class="px-4 py-2 rounded-lg bg-slate-700">取消</button>' +
+                '<button id="mCustSave" class="btn-primary px-4 py-2 rounded-lg" data-code="' + (cust ? cust.code : '') + '">儲存</button>' +
+                '</div></div></div></div>';
+            
+            $('modalContainer').innerHTML = html;
+            $('mCustCancel').onclick = closeModal;
+            $('mCustSave').onclick = function() {
+                var code = this.getAttribute('data-code');
+                var custData = {
+                    code: $('mCustCode').value,
+                    name: $('mCustName').value,
+                    shortName: $('mCustShort').value
+                };
+                var list = getData('customers');
+                if (code) {
+                    for (var i = 0; i < list.length; i++) {
+                        if (list[i].code === code) { list[i] = custData; break; }
+                    }
+                } else {
+                    list.push(custData);
+                }
+                setData('customers', list);
+                closeModal();
+                loadSettings();
+                toast('已儲存', 'success');
+            };
+        }
+        
+        function openSupplierModal(editCode) {
+            var suppliers = getData('suppliers');
+            var sup = null;
+            if (editCode) {
+                for (var i = 0; i < suppliers.length; i++) {
+                    if (suppliers[i].code === editCode) { sup = suppliers[i]; break; }
+                }
+            }
+            
+            var html = '<div class="fixed inset-0 modal-overlay flex items-center justify-center z-50">' +
+                '<div class="modal-content rounded-xl w-full max-w-md p-6 m-4">' +
+                '<h3 class="text-xl font-bold mb-6">' + (sup ? '編輯' : '新增') + '供應商</h3>' +
+                '<div class="space-y-4">' +
+                '<div><label class="block text-sm text-slate-400 mb-1">代碼</label><input type="text" id="mSupCode" class="input-field w-full rounded-lg px-4 py-2" value="' + (sup ? sup.code : 'V' + String(suppliers.length + 1).padStart(3, '0')) + '"' + (sup ? ' readonly' : '') + '></div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">名稱</label><input type="text" id="mSupName" class="input-field w-full rounded-lg px-4 py-2" value="' + (sup ? sup.name : '') + '"></div>' +
+                '<div class="flex justify-end gap-2 mt-6">' +
+                '<button id="mSupCancel" class="px-4 py-2 rounded-lg bg-slate-700">取消</button>' +
+                '<button id="mSupSave" class="btn-primary px-4 py-2 rounded-lg" data-code="' + (sup ? sup.code : '') + '">儲存</button>' +
+                '</div></div></div></div>';
+            
+            $('modalContainer').innerHTML = html;
+            $('mSupCancel').onclick = closeModal;
+            $('mSupSave').onclick = function() {
+                var code = this.getAttribute('data-code');
+                var supData = {
+                    code: $('mSupCode').value,
+                    name: $('mSupName').value
+                };
+                var list = getData('suppliers');
+                if (code) {
+                    for (var i = 0; i < list.length; i++) {
+                        if (list[i].code === code) { list[i] = supData; break; }
+                    }
+                } else {
+                    list.push(supData);
+                }
+                setData('suppliers', list);
+                closeModal();
+                loadSettings();
+                toast('已儲存', 'success');
+            };
+        }
+        
+        // ============== 事件綁定 ==============
+        function initEvents() {
+            // 側邊欄導航 - 使用事件委派
+            var sidebarItems = $$('.sidebar-item');
+            for (var i = 0; i < sidebarItems.length; i++) {
+                sidebarItems[i].addEventListener('click', function() {
+                    var page = this.getAttribute('data-page');
+                    if (page) showPage(page);
+                });
+            }
+            
+            // 按鈕
+            $('btnAddAr').addEventListener('click', function() { openArModal(); });
+            $('btnAddAp').addEventListener('click', function() { openApModal(); });
+            $('btnAddProject').addEventListener('click', function() { openProjectModal(); });
+            $('btnCalcBonus').addEventListener('click', function() { loadBonusList(); toast('已重新計算', 'success'); });
+            $('btnSaveCompany').addEventListener('click', function() { toast('已儲存', 'success'); });
+            $('btnAddCustomer').addEventListener('click', function() { openCustomerModal(); });
+            $('btnAddSupplier').addEventListener('click', function() { openSupplierModal(); });
+            
+            // 表格操作 - 使用事件委派
+            document.addEventListener('click', function(e) {
+                var target = e.target;
+                
+                if (target.hasAttribute('data-edit-ar')) {
+                    openArModal(target.getAttribute('data-edit-ar'));
+                }
+                if (target.hasAttribute('data-pay-ar')) {
+                    openPayArModal(target.getAttribute('data-pay-ar'));
+                }
+                if (target.hasAttribute('data-edit-ap')) {
+                    openApModal(target.getAttribute('data-edit-ap'));
+                }
+                if (target.hasAttribute('data-pay-ap')) {
+                    markApPaid(target.getAttribute('data-pay-ap'));
+                }
+                if (target.hasAttribute('data-edit-project')) {
+                    openProjectModal(target.getAttribute('data-edit-project'));
+                }
+                if (target.hasAttribute('data-edit-customer')) {
+                    openCustomerModal(target.getAttribute('data-edit-customer'));
+                }
+                if (target.hasAttribute('data-edit-supplier')) {
+                    openSupplierModal(target.getAttribute('data-edit-supplier'));
+                }
+            });
+            
+            // 搜尋
+            $('arSearch').addEventListener('input', function() {
+                // 簡易搜尋實作
+                loadArList();
+            });
+        }
+        
+        // ============== 初始化 ==============
+        function init() {
+            console.log('智鐵機械財務管理系統 v' + VERSION + ' 啟動');
+            initEvents();
+            loadDashboard();
+        }
+        
+        // DOM 載入完成後執行
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    })();
+    </script>
+</body>
+</html>
