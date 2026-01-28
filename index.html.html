@@ -320,6 +320,7 @@
         function fmtDate(d) { return d ? new Date(d).toLocaleDateString('zh-TW') : '-'; }
         function genId(p) { return (p||'id') + '_' + Date.now() + '_' + Math.random().toString(36).substr(2,4); }
         function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+        function escAttr(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
         function getData(k) {
             try { return JSON.parse(localStorage.getItem('zt_'+k)) || []; }
@@ -1023,7 +1024,7 @@
                 '<div><label class="block text-sm text-slate-400 mb-1">專案代號 <span class="text-red-400">*</span></label><input type="text" id="mProjCode" class="input-field w-full rounded-lg px-4 py-2" value="' + code + '"></div>' +
                 '<div><label class="block text-sm text-slate-400 mb-1">客戶 <span class="text-red-400">*</span></label><select id="mProjCustomer" class="input-field w-full rounded-lg px-4 py-2">' + custOpts + '</select></div>' +
                 '</div>' +
-                '<div><label class="block text-sm text-slate-400 mb-1">專案名稱 <span class="text-red-400">*</span></label><input type="text" id="mProjName" class="input-field w-full rounded-lg px-4 py-2" value="' + (project ? project.name : '') + '"></div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">專案名稱 <span class="text-red-400">*</span></label><input type="text" id="mProjName" class="input-field w-full rounded-lg px-4 py-2" value="' + escAttr(project ? project.name : '') + '"></div>' +
                 '<div class="grid grid-cols-3 gap-4">' +
                 '<div><label class="block text-sm text-slate-400 mb-1">訂單金額 <span class="text-red-400">*</span></label><input type="number" id="mProjOrder" class="input-field w-full rounded-lg px-4 py-2" value="' + (project ? project.orderAmount : '') + '"></div>' +
                 '<div><label class="block text-sm text-slate-400 mb-1">材料費</label><input type="number" id="mProjMaterial" class="input-field w-full rounded-lg px-4 py-2" value="' + (project ? project.materialCost||0 : 0) + '"></div>' +
@@ -1194,7 +1195,7 @@
                 '<div><label class="block text-sm text-slate-400 mb-1">類型</label><select id="mCommType" class="input-field w-full rounded-lg px-4 py-2">' + typeOpts + '</select></div>' +
                 '<div><label class="block text-sm text-slate-400 mb-1">金額 <span class="text-red-400">*</span></label><input type="number" id="mCommAmount" class="input-field w-full rounded-lg px-4 py-2" value="' + (comm ? comm.amount : '') + '"></div>' +
                 '</div>' +
-                '<div><label class="block text-sm text-slate-400 mb-1">說明</label><input type="text" id="mCommDesc" class="input-field w-full rounded-lg px-4 py-2" value="' + (comm ? (comm.description||'') : '') + '"></div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">說明</label><input type="text" id="mCommDesc" class="input-field w-full rounded-lg px-4 py-2" value="' + escAttr(comm ? (comm.description||'') : '') + '"></div>' +
                 '<div><label class="block text-sm text-slate-400 mb-1">日期</label><input type="date" id="mCommDate" class="input-field w-full rounded-lg px-4 py-2" value="' + (comm ? comm.date : today) + '"></div>' +
                 '<div class="flex justify-end gap-2 mt-6">' +
                 '<button id="mCommCancel" class="px-4 py-2 rounded-lg bg-slate-700">取消</button>' +
