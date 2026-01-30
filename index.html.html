@@ -266,7 +266,7 @@
             <!-- 資料備份 -->
             <div id="page-backup" class="page-content p-6">
                 <h2 class="text-2xl font-bold mb-6">💾 資料備份</h2>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                     <div class="data-table rounded-xl p-6">
                         <h3 class="font-bold text-lg mb-4">匯出資料</h3>
                         <p class="text-sm text-slate-400 mb-4">將所有資料匯出為 JSON 檔案，可用於備份或轉移。</p>
@@ -274,7 +274,7 @@
                         <button id="btnExport" class="btn-primary px-4 py-2 rounded-lg w-full">📥 匯出 JSON</button>
                     </div>
                     <div class="data-table rounded-xl p-6">
-                        <h3 class="font-bold text-lg mb-4">匯入資料</h3>
+                        <h3 class="font-bold text-lg mb-4">匯入資料 (JSON)</h3>
                         <p class="text-sm text-slate-400 mb-4">從 JSON 檔案匯入資料，將覆蓋現有資料。</p>
                         <div class="mb-4">
                             <label class="block w-full p-8 border-2 border-dashed border-slate-600 rounded-lg text-center cursor-pointer hover:border-blue-500 transition">
@@ -285,6 +285,56 @@
                         <div id="importPreview" class="mb-4 hidden p-4 bg-slate-800 rounded-lg text-sm space-y-1"></div>
                         <button id="btnImport" class="btn-danger px-4 py-2 rounded-lg w-full" disabled>📤 確認匯入（將覆蓋現有資料）</button>
                     </div>
+                </div>
+                <div class="data-table rounded-xl p-6">
+                    <h3 class="font-bold text-lg mb-4">📄 CSV 批次匯入</h3>
+                    <p class="text-sm text-slate-400 mb-4">從 CSV 檔案批次匯入資料，新資料將<span class="text-amber-400">合併</span>至現有資料（不會覆蓋）。</p>
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm text-slate-400 mb-2">客戶</label>
+                            <label class="block w-full p-3 border border-slate-600 rounded-lg text-center cursor-pointer hover:border-blue-500 transition text-sm">
+                                <span id="csvCustLabel">選擇檔案</span>
+                                <input type="file" id="csvCustomers" accept=".csv" class="hidden">
+                            </label>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-slate-400 mb-2">供應商</label>
+                            <label class="block w-full p-3 border border-slate-600 rounded-lg text-center cursor-pointer hover:border-blue-500 transition text-sm">
+                                <span id="csvSupLabel">選擇檔案</span>
+                                <input type="file" id="csvSuppliers" accept=".csv" class="hidden">
+                            </label>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-slate-400 mb-2">專案</label>
+                            <label class="block w-full p-3 border border-slate-600 rounded-lg text-center cursor-pointer hover:border-blue-500 transition text-sm">
+                                <span id="csvProjLabel">選擇檔案</span>
+                                <input type="file" id="csvProjects" accept=".csv" class="hidden">
+                            </label>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-slate-400 mb-2">應收帳款</label>
+                            <label class="block w-full p-3 border border-slate-600 rounded-lg text-center cursor-pointer hover:border-blue-500 transition text-sm">
+                                <span id="csvArLabel">選擇檔案</span>
+                                <input type="file" id="csvAr" accept=".csv" class="hidden">
+                            </label>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-slate-400 mb-2">應付帳款</label>
+                            <label class="block w-full p-3 border border-slate-600 rounded-lg text-center cursor-pointer hover:border-blue-500 transition text-sm">
+                                <span id="csvApLabel">選擇檔案</span>
+                                <input type="file" id="csvAp" accept=".csv" class="hidden">
+                            </label>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-slate-400 mb-2">佣金</label>
+                            <label class="block w-full p-3 border border-slate-600 rounded-lg text-center cursor-pointer hover:border-blue-500 transition text-sm">
+                                <span id="csvCommLabel">選擇檔案</span>
+                                <input type="file" id="csvCommissions" accept=".csv" class="hidden">
+                            </label>
+                        </div>
+                    </div>
+                    <div id="csvPreview" class="mb-4 hidden p-4 bg-slate-800 rounded-lg text-sm space-y-1"></div>
+                    <button id="btnCsvImport" class="btn-primary px-4 py-2 rounded-lg w-full" disabled>📤 匯入 CSV 資料</button>
                 </div>
             </div>
         </main>
@@ -1765,6 +1815,267 @@
             });
         }
 
+        // ============== CSV 匯入功能 ==============
+        var pendingCsvData = {customers:null, suppliers:null, projects:null, ar:null, ap:null, commissions:null};
+
+        function parseCSV(text) {
+            var lines = text.split(/\r?\n/).filter(function(l) { return l.trim(); });
+            if (lines.length < 2) return [];
+            var headers = lines[0].split(',').map(function(h) { return h.trim(); });
+            var rows = [];
+            for (var i = 1; i < lines.length; i++) {
+                var values = lines[i].split(',');
+                var obj = {};
+                for (var j = 0; j < headers.length; j++) {
+                    obj[headers[j]] = (values[j] || '').trim();
+                }
+                rows.push(obj);
+            }
+            return rows;
+        }
+
+        function handleCsvFile(type, e) {
+            var file = e.target.files[0];
+            if (!file) return;
+            var labelId = {customers:'csvCustLabel', suppliers:'csvSupLabel', projects:'csvProjLabel', ar:'csvArLabel', ap:'csvApLabel', commissions:'csvCommLabel'};
+            $(labelId[type]).textContent = file.name;
+            var reader = new FileReader();
+            reader.onload = function(ev) {
+                try {
+                    var rows = parseCSV(ev.target.result);
+                    if (rows.length === 0) {
+                        toast('CSV 檔案無有效資料', 'error');
+                        pendingCsvData[type] = null;
+                        return;
+                    }
+                    pendingCsvData[type] = rows;
+                    updateCsvPreview();
+                } catch(err) {
+                    toast('CSV 解析失敗：' + err.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function updateCsvPreview() {
+            var preview = $('csvPreview');
+            var labels = {customers:'客戶', suppliers:'供應商', projects:'專案', ar:'應收帳款', ap:'應付帳款', commissions:'佣金'};
+            var hasData = false;
+            var html = '<p class="font-bold text-white mb-2">待匯入資料：</p>';
+            for (var key in pendingCsvData) {
+                if (pendingCsvData[key] && pendingCsvData[key].length > 0) {
+                    html += '<p class="text-slate-400">' + labels[key] + '：<span class="text-green-400">' + pendingCsvData[key].length + ' 筆</span></p>';
+                    hasData = true;
+                }
+            }
+            if (hasData) {
+                preview.innerHTML = html;
+                preview.classList.remove('hidden');
+                $('btnCsvImport').disabled = false;
+            } else {
+                preview.classList.add('hidden');
+                $('btnCsvImport').disabled = true;
+            }
+        }
+
+        function importCsvData() {
+            var importOrder = ['customers', 'suppliers', 'projects', 'ar', 'ap', 'commissions'];
+            var counts = {customers:0, suppliers:0, projects:0, ar:0, ap:0, commissions:0};
+
+            // 1. Import customers
+            if (pendingCsvData.customers) {
+                var custList = getData('customers');
+                var existingCodes = {};
+                for (var c = 0; c < custList.length; c++) existingCodes[custList[c].code] = true;
+                for (var i = 0; i < pendingCsvData.customers.length; i++) {
+                    var row = pendingCsvData.customers[i];
+                    if (row.code && !existingCodes[row.code]) {
+                        custList.push({code: row.code, name: row.name || '', shortName: row.shortName || ''});
+                        existingCodes[row.code] = true;
+                        counts.customers++;
+                    }
+                }
+                setData('customers', custList);
+            }
+
+            // 2. Import suppliers
+            if (pendingCsvData.suppliers) {
+                var supList = getData('suppliers');
+                var existingSupCodes = {};
+                for (var s = 0; s < supList.length; s++) existingSupCodes[supList[s].code] = true;
+                for (var j = 0; j < pendingCsvData.suppliers.length; j++) {
+                    var srow = pendingCsvData.suppliers[j];
+                    if (srow.code && !existingSupCodes[srow.code]) {
+                        supList.push({code: srow.code, name: srow.name || ''});
+                        existingSupCodes[srow.code] = true;
+                        counts.suppliers++;
+                    }
+                }
+                setData('suppliers', supList);
+            }
+
+            // 3. Import projects
+            if (pendingCsvData.projects) {
+                var projList = getData('projects');
+                var custList2 = getData('customers');
+                var existingProjCodes = {};
+                for (var p = 0; p < projList.length; p++) existingProjCodes[projList[p].code] = true;
+                for (var k = 0; k < pendingCsvData.projects.length; k++) {
+                    var prow = pendingCsvData.projects[k];
+                    if (prow.code && !existingProjCodes[prow.code]) {
+                        var cust = null;
+                        for (var cc = 0; cc < custList2.length; cc++) {
+                            if (custList2[cc].code === prow.customerCode) { cust = custList2[cc]; break; }
+                        }
+                        projList.push({
+                            id: genId('pj'),
+                            code: prow.code,
+                            name: prow.name || '',
+                            customerCode: cust ? cust.code : '',
+                            customerName: cust ? (cust.shortName || cust.name) : '',
+                            orderAmount: parseFloat(prow.orderAmount) || 0,
+                            materialCost: parseFloat(prow.materialCost) || 0,
+                            laborCost: parseFloat(prow.laborCost) || 0,
+                            status: prow.status || 'ongoing',
+                            commission: 0,
+                            collectionRate: 0,
+                            bonusStatus: 'pending',
+                            bonusPaidDate: null,
+                            createdAt: new Date().toISOString()
+                        });
+                        existingProjCodes[prow.code] = true;
+                        counts.projects++;
+                    }
+                }
+                setData('projects', projList);
+            }
+
+            // 4. Import AR
+            if (pendingCsvData.ar) {
+                var arList = getData('ar');
+                var projList3 = getData('projects');
+                var custList3 = getData('customers');
+                for (var a = 0; a < pendingCsvData.ar.length; a++) {
+                    var arow = pendingCsvData.ar[a];
+                    var proj = null, cust2 = null;
+                    for (var pp = 0; pp < projList3.length; pp++) {
+                        if (projList3[pp].code === arow.projectCode) { proj = projList3[pp]; break; }
+                    }
+                    for (var ccc = 0; ccc < custList3.length; ccc++) {
+                        if (custList3[ccc].code === arow.customerCode) { cust2 = custList3[ccc]; break; }
+                    }
+                    if (proj) {
+                        arList.push({
+                            id: genId('ar'),
+                            projectId: proj.id,
+                            projectCode: proj.code,
+                            customerCode: cust2 ? cust2.code : '',
+                            customerName: cust2 ? (cust2.shortName || cust2.name) : '',
+                            type: arow.type || 'deposit',
+                            amount: parseFloat(arow.amount) || 0,
+                            paidAmount: parseFloat(arow.paidAmount) || 0,
+                            dueDate: arow.dueDate || '',
+                            createdAt: new Date().toISOString()
+                        });
+                        counts.ar++;
+                    }
+                }
+                setData('ar', arList);
+                // Update collection rates
+                var projList4 = getData('projects');
+                for (var pr = 0; pr < projList4.length; pr++) {
+                    updateProjectCollectionRate(projList4[pr].id);
+                }
+            }
+
+            // 5. Import AP
+            if (pendingCsvData.ap) {
+                var apList = getData('ap');
+                var projList5 = getData('projects');
+                var supList2 = getData('suppliers');
+                for (var b = 0; b < pendingCsvData.ap.length; b++) {
+                    var brow = pendingCsvData.ap[b];
+                    var proj2 = null, sup = null;
+                    for (var ppp = 0; ppp < projList5.length; ppp++) {
+                        if (projList5[ppp].code === brow.projectCode) { proj2 = projList5[ppp]; break; }
+                    }
+                    for (var ss = 0; ss < supList2.length; ss++) {
+                        if (supList2[ss].code === brow.vendorCode) { sup = supList2[ss]; break; }
+                    }
+                    if (sup) {
+                        apList.push({
+                            id: genId('ap'),
+                            projectId: proj2 ? proj2.id : null,
+                            projectCode: proj2 ? proj2.code : '',
+                            vendorCode: sup.code,
+                            vendorName: sup.name,
+                            paymentType: brow.paymentType || 'CHECK',
+                            amount: parseFloat(brow.amount) || 0,
+                            dueDate: brow.dueDate || '',
+                            status: brow.status || 'pending',
+                            createdAt: new Date().toISOString()
+                        });
+                        counts.ap++;
+                    }
+                }
+                setData('ap', apList);
+            }
+
+            // 6. Import commissions
+            if (pendingCsvData.commissions) {
+                var commList = getData('commissions');
+                var projList6 = getData('projects');
+                for (var m = 0; m < pendingCsvData.commissions.length; m++) {
+                    var mrow = pendingCsvData.commissions[m];
+                    var proj3 = null;
+                    for (var pppp = 0; pppp < projList6.length; pppp++) {
+                        if (projList6[pppp].code === mrow.projectCode) { proj3 = projList6[pppp]; break; }
+                    }
+                    if (proj3) {
+                        commList.push({
+                            id: genId('cm'),
+                            projectId: proj3.id,
+                            projectCode: proj3.code,
+                            type: mrow.type || 'agent',
+                            amount: parseFloat(mrow.amount) || 0,
+                            description: mrow.description || '',
+                            date: mrow.date || '',
+                            createdAt: new Date().toISOString()
+                        });
+                        counts.commissions++;
+                    }
+                }
+                setData('commissions', commList);
+                // Update project commissions
+                var projList7 = getData('projects');
+                for (var pr2 = 0; pr2 < projList7.length; pr2++) {
+                    updateProjectCommission(projList7[pr2].id);
+                }
+            }
+
+            // Clear pending data and reset UI
+            pendingCsvData = {customers:null, suppliers:null, projects:null, ar:null, ap:null, commissions:null};
+            $('csvPreview').classList.add('hidden');
+            $('btnCsvImport').disabled = true;
+            var inputs = ['csvCustomers', 'csvSuppliers', 'csvProjects', 'csvAr', 'csvAp', 'csvCommissions'];
+            var labels = ['csvCustLabel', 'csvSupLabel', 'csvProjLabel', 'csvArLabel', 'csvApLabel', 'csvCommLabel'];
+            for (var r = 0; r < inputs.length; r++) {
+                $(inputs[r]).value = '';
+                $(labels[r]).textContent = '選擇檔案';
+            }
+            loadBackupPage();
+
+            var msg = '匯入完成：';
+            if (counts.customers) msg += '客戶 ' + counts.customers + ' 筆、';
+            if (counts.suppliers) msg += '供應商 ' + counts.suppliers + ' 筆、';
+            if (counts.projects) msg += '專案 ' + counts.projects + ' 筆、';
+            if (counts.ar) msg += '應收 ' + counts.ar + ' 筆、';
+            if (counts.ap) msg += '應付 ' + counts.ap + ' 筆、';
+            if (counts.commissions) msg += '佣金 ' + counts.commissions + ' 筆、';
+            msg = msg.replace(/、$/, '');
+            toast(msg, 'success');
+        }
+
         // ============== 事件綁定 ==============
         function initEvents() {
             var sidebarItems = $$('.sidebar-item');
@@ -1787,6 +2098,15 @@
             $('btnExport').addEventListener('click', function() { exportData(); });
             $('btnImport').addEventListener('click', function() { importData(); });
             $('importFile').addEventListener('change', handleImportFile);
+
+            // CSV import events
+            $('csvCustomers').addEventListener('change', function(e) { handleCsvFile('customers', e); });
+            $('csvSuppliers').addEventListener('change', function(e) { handleCsvFile('suppliers', e); });
+            $('csvProjects').addEventListener('change', function(e) { handleCsvFile('projects', e); });
+            $('csvAr').addEventListener('change', function(e) { handleCsvFile('ar', e); });
+            $('csvAp').addEventListener('change', function(e) { handleCsvFile('ap', e); });
+            $('csvCommissions').addEventListener('change', function(e) { handleCsvFile('commissions', e); });
+            $('btnCsvImport').addEventListener('click', function() { importCsvData(); });
 
             // Delegated click events
             document.addEventListener('click', function(e) {
