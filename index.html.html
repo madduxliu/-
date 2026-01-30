@@ -332,13 +332,14 @@
         function setData(k, v) {
             try {
                 localStorage.setItem('zt_'+k, JSON.stringify(v));
+                return true;
             } catch(e) {
                 if (e.name === 'QuotaExceededError' || e.code === 22) {
                     toast('儲存空間已滿，請匯出備份後清理資料', 'error');
                 } else {
                     toast('儲存失敗：' + e.message, 'error');
                 }
-                throw e;
+                return false;
             }
         }
         function getObj(k) {
@@ -348,13 +349,14 @@
         function setObj(k, v) {
             try {
                 localStorage.setItem('zt_'+k, JSON.stringify(v));
+                return true;
             } catch(e) {
                 if (e.name === 'QuotaExceededError' || e.code === 22) {
                     toast('儲存空間已滿，請匯出備份後清理資料', 'error');
                 } else {
                     toast('儲存失敗：' + e.message, 'error');
                 }
-                throw e;
+                return false;
             }
         }
 
@@ -654,6 +656,10 @@
                 toast('請填寫所有必填欄位', 'error');
                 return;
             }
+            if (amount <= 0) {
+                toast('金額必須大於 0', 'error');
+                return;
+            }
 
             var project = null, customer = null;
             for (var i = 0; i < projects.length; i++) {
@@ -747,6 +753,11 @@
                 var projectId = null;
                 for (var i = 0; i < list.length; i++) {
                     if (list[i].id === arId) {
+                        var currentRemaining = list[i].amount - (list[i].paidAmount || 0);
+                        if (amount > currentRemaining) {
+                            toast('收款金額不能超過待收金額 ' + fmt(currentRemaining), 'error');
+                            return;
+                        }
                         list[i].paidAmount = (list[i].paidAmount || 0) + amount;
                         projectId = list[i].projectId;
                         break;
@@ -909,6 +920,10 @@
                 toast('請填寫供應商、金額與到期日', 'error');
                 return;
             }
+            if (amount <= 0) {
+                toast('金額必須大於 0', 'error');
+                return;
+            }
 
             var project = null, vendor = null;
             for (var i = 0; i < projects.length; i++) {
@@ -1063,7 +1078,7 @@
                 '<h3 class="text-xl font-bold mb-6">' + (project ? '編輯' : '新增') + '工程專案</h3>' +
                 '<div class="space-y-4">' +
                 '<div class="grid grid-cols-2 gap-4">' +
-                '<div><label class="block text-sm text-slate-400 mb-1">專案代號 <span class="text-red-400">*</span></label><input type="text" id="mProjCode" class="input-field w-full rounded-lg px-4 py-2" value="' + code + '"></div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">專案代號 <span class="text-red-400">*</span></label><input type="text" id="mProjCode" class="input-field w-full rounded-lg px-4 py-2" value="' + escAttr(code) + '"></div>' +
                 '<div><label class="block text-sm text-slate-400 mb-1">客戶 <span class="text-red-400">*</span></label><select id="mProjCustomer" class="input-field w-full rounded-lg px-4 py-2">' + custOpts + '</select></div>' +
                 '</div>' +
                 '<div><label class="block text-sm text-slate-400 mb-1">專案名稱 <span class="text-red-400">*</span></label><input type="text" id="mProjName" class="input-field w-full rounded-lg px-4 py-2" value="' + escAttr(project ? project.name : '') + '"></div>' +
@@ -1101,6 +1116,10 @@
 
             if (!projCode || !projName || !orderAmount) {
                 toast('請填寫專案代號、名稱與訂單金額', 'error');
+                return;
+            }
+            if (orderAmount <= 0) {
+                toast('訂單金額必須大於 0', 'error');
                 return;
             }
 
@@ -1300,6 +1319,10 @@
 
             if (!projId || !amount) {
                 toast('請選擇專案並填寫金額', 'error');
+                return;
+            }
+            if (amount <= 0) {
+                toast('金額必須大於 0', 'error');
                 return;
             }
 
@@ -1511,8 +1534,8 @@
                 '<h3 class="text-xl font-bold mb-6">' + (cust ? '編輯' : '新增') + '客戶</h3>' +
                 '<div class="space-y-4">' +
                 '<div><label class="block text-sm text-slate-400 mb-1">代碼</label><input type="text" id="mCustCode" class="input-field w-full rounded-lg px-4 py-2" value="' + (cust ? cust.code : 'C' + String(customers.length + 1).padStart(3, '0')) + '"' + (cust ? ' readonly' : '') + '></div>' +
-                '<div><label class="block text-sm text-slate-400 mb-1">名稱</label><input type="text" id="mCustName" class="input-field w-full rounded-lg px-4 py-2" value="' + (cust ? cust.name : '') + '"></div>' +
-                '<div><label class="block text-sm text-slate-400 mb-1">簡稱</label><input type="text" id="mCustShort" class="input-field w-full rounded-lg px-4 py-2" value="' + (cust ? cust.shortName||'' : '') + '"></div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">名稱</label><input type="text" id="mCustName" class="input-field w-full rounded-lg px-4 py-2" value="' + escAttr(cust ? cust.name : '') + '"></div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">簡稱</label><input type="text" id="mCustShort" class="input-field w-full rounded-lg px-4 py-2" value="' + escAttr(cust ? cust.shortName||'' : '') + '"></div>' +
                 '<div class="flex justify-end gap-2 mt-6">' +
                 '<button id="mCustCancel" class="px-4 py-2 rounded-lg bg-slate-700">取消</button>' +
                 '<button id="mCustSave" class="btn-primary px-4 py-2 rounded-lg" data-code="' + (cust ? cust.code : '') + '">儲存</button>' +
@@ -1550,13 +1573,22 @@
                     if (list[i].code !== code) newList.push(list[i]);
                 }
                 setData('customers', newList);
-                // Also remove related AR records
+                // Also remove related AR records and update affected project collection rates
                 var arList = getData('ar');
                 var newAr = [];
+                var affectedProjects = {};
                 for (var j = 0; j < arList.length; j++) {
-                    if (arList[j].customerCode !== code) newAr.push(arList[j]);
+                    if (arList[j].customerCode !== code) {
+                        newAr.push(arList[j]);
+                    } else if (arList[j].projectId) {
+                        affectedProjects[arList[j].projectId] = true;
+                    }
                 }
                 setData('ar', newAr);
+                // Update collection rates for affected projects
+                for (var pid in affectedProjects) {
+                    updateProjectCollectionRate(pid);
+                }
                 loadSettings();
                 toast('已刪除客戶及相關記錄', 'success');
             });
@@ -1576,7 +1608,7 @@
                 '<h3 class="text-xl font-bold mb-6">' + (sup ? '編輯' : '新增') + '供應商</h3>' +
                 '<div class="space-y-4">' +
                 '<div><label class="block text-sm text-slate-400 mb-1">代碼</label><input type="text" id="mSupCode" class="input-field w-full rounded-lg px-4 py-2" value="' + (sup ? sup.code : 'V' + String(suppliers.length + 1).padStart(3, '0')) + '"' + (sup ? ' readonly' : '') + '></div>' +
-                '<div><label class="block text-sm text-slate-400 mb-1">名稱</label><input type="text" id="mSupName" class="input-field w-full rounded-lg px-4 py-2" value="' + (sup ? sup.name : '') + '"></div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">名稱</label><input type="text" id="mSupName" class="input-field w-full rounded-lg px-4 py-2" value="' + escAttr(sup ? sup.name : '') + '"></div>' +
                 '<div class="flex justify-end gap-2 mt-6">' +
                 '<button id="mSupCancel" class="px-4 py-2 rounded-lg bg-slate-700">取消</button>' +
                 '<button id="mSupSave" class="btn-primary px-4 py-2 rounded-lg" data-code="' + (sup ? sup.code : '') + '">儲存</button>' +
