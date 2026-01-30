@@ -188,6 +188,9 @@
                     <h2 class="text-2xl font-bold">💼 佣金管理</h2>
                     <button id="btnAddCommission" class="btn-primary px-4 py-2 rounded-lg">+ 新增佣金</button>
                 </div>
+                <div class="mb-4">
+                    <input type="text" id="commSearch" placeholder="搜尋專案、類型、說明..." class="input-field rounded-lg px-4 py-2 w-full max-w-md">
+                </div>
                 <div class="grid grid-cols-3 gap-4 mb-6">
                     <div class="data-table rounded-xl p-4"><p class="text-sm text-slate-400">🤝 代理佣金</p><p id="commAgent" class="text-xl font-bold mono">NT$ 0</p></div>
                     <div class="data-table rounded-xl p-4"><p class="text-sm text-slate-400">🔗 轉介佣金</p><p id="commReferral" class="text-xl font-bold mono">NT$ 0</p></div>
@@ -222,7 +225,7 @@
                             <tr class="text-left text-sm text-slate-400 border-b border-slate-700">
                                 <th class="p-4">專案</th><th class="p-4 text-right">訂單</th><th class="p-4 text-right">佣金</th>
                                 <th class="p-4 text-right">成本×1.15</th><th class="p-4 text-right">獎金</th>
-                                <th class="p-4 text-center">收款率</th><th class="p-4">狀態</th>
+                                <th class="p-4 text-center">收款率</th><th class="p-4">狀態</th><th class="p-4">操作</th>
                             </tr>
                         </thead>
                         <tbody id="bonusTableBody"></tbody>
@@ -327,14 +330,32 @@
             catch(e) { return []; }
         }
         function setData(k, v) {
-            localStorage.setItem('zt_'+k, JSON.stringify(v));
+            try {
+                localStorage.setItem('zt_'+k, JSON.stringify(v));
+            } catch(e) {
+                if (e.name === 'QuotaExceededError' || e.code === 22) {
+                    toast('儲存空間已滿，請匯出備份後清理資料', 'error');
+                } else {
+                    toast('儲存失敗：' + e.message, 'error');
+                }
+                throw e;
+            }
         }
         function getObj(k) {
             try { return JSON.parse(localStorage.getItem('zt_'+k)) || {}; }
             catch(e) { return {}; }
         }
         function setObj(k, v) {
-            localStorage.setItem('zt_'+k, JSON.stringify(v));
+            try {
+                localStorage.setItem('zt_'+k, JSON.stringify(v));
+            } catch(e) {
+                if (e.name === 'QuotaExceededError' || e.code === 22) {
+                    toast('儲存空間已滿，請匯出備份後清理資料', 'error');
+                } else {
+                    toast('儲存失敗：' + e.message, 'error');
+                }
+                throw e;
+            }
         }
 
         function toast(msg, type) {
@@ -474,7 +495,8 @@
                 var p = projects[k];
                 var cost = ((p.materialCost||0) + (p.laborCost||0)) * FACTOR;
                 var bonus = (p.orderAmount||0) - (p.commission||0) - cost;
-                if ((p.collectionRate||0) >= THRESHOLD && bonus > 0) {
+                // Only count unpaid bonuses that meet criteria
+                if ((p.collectionRate||0) >= THRESHOLD && bonus > 0 && p.bonusStatus !== 'paid') {
                     bonusTotal += bonus;
                     bonusCount++;
                 }
@@ -639,6 +661,15 @@
             }
             for (var j = 0; j < customers.length; j++) {
                 if (customers[j].code === custCode) { customer = customers[j]; break; }
+            }
+
+            if (!project) {
+                toast('專案不存在，請重新選擇', 'error');
+                return;
+            }
+            if (!customer) {
+                toast('客戶不存在，請重新選擇', 'error');
+                return;
             }
 
             var arData = {
@@ -874,8 +905,8 @@
             var amount = parseFloat($('mApAmount').value) || 0;
             var dueDate = $('mApDueDate').value;
 
-            if (!amount || !dueDate) {
-                toast('請填寫金額與到期日', 'error');
+            if (!vendorCode || !amount || !dueDate) {
+                toast('請填寫供應商、金額與到期日', 'error');
                 return;
             }
 
@@ -885,6 +916,11 @@
             }
             for (var j = 0; j < suppliers.length; j++) {
                 if (suppliers[j].code === vendorCode) { vendor = suppliers[j]; break; }
+            }
+
+            if (!vendor) {
+                toast('供應商不存在，請重新選擇', 'error');
+                return;
             }
 
             var apData = {
@@ -979,10 +1015,16 @@
                 var bonus = (p.orderAmount||0) - (p.commission||0) - cost;
                 var rate = p.collectionRate || 0;
 
+                var statusLabels = {ongoing:'進行中', completed:'已完工', closed:'已結案'};
+                var statusColors = {ongoing:'bg-blue-500/20 text-blue-300', completed:'bg-green-500/20 text-green-300', closed:'bg-slate-500/20 text-slate-300'};
+                var pStatus = p.status || 'ongoing';
+
                 html += '<div class="data-table rounded-xl overflow-hidden">' +
                     '<div class="p-4 border-b border-slate-700 flex justify-between items-center">' +
                     '<div class="flex items-center gap-3"><span class="text-2xl">🏗️</span><div><h4 class="font-bold">' + esc(p.code) + '</h4><p class="text-sm text-slate-400">' + esc(p.name) + '</p></div></div>' +
-                    '<div class="flex items-center gap-4"><span class="px-3 py-1 rounded-full text-xs ' + (rate >= 80 ? 'bg-green-500/20 text-green-300' : 'bg-amber-500/20 text-amber-300') + '">收款 ' + rate.toFixed(1) + '%</span>' +
+                    '<div class="flex items-center gap-4">' +
+                    '<span class="px-3 py-1 rounded-full text-xs ' + statusColors[pStatus] + '">' + statusLabels[pStatus] + '</span>' +
+                    '<span class="px-3 py-1 rounded-full text-xs ' + (rate >= 80 ? 'bg-green-500/20 text-green-300' : 'bg-amber-500/20 text-amber-300') + '">收款 ' + rate.toFixed(1) + '%</span>' +
                     '<button class="text-blue-400" data-edit-project="' + p.id + '">編輯</button>' +
                     '<button class="text-red-400" data-delete-project="' + p.id + '">刪除</button></div></div>' +
                     '<div class="p-4 grid grid-cols-5 gap-4">' +
@@ -1030,6 +1072,11 @@
                 '<div><label class="block text-sm text-slate-400 mb-1">材料費</label><input type="number" id="mProjMaterial" class="input-field w-full rounded-lg px-4 py-2" value="' + (project ? project.materialCost||0 : 0) + '"></div>' +
                 '<div><label class="block text-sm text-slate-400 mb-1">人工費</label><input type="number" id="mProjLabor" class="input-field w-full rounded-lg px-4 py-2" value="' + (project ? project.laborCost||0 : 0) + '"></div>' +
                 '</div>' +
+                '<div><label class="block text-sm text-slate-400 mb-1">專案狀態</label><select id="mProjStatus" class="input-field w-full rounded-lg px-4 py-2">' +
+                '<option value="ongoing"' + (project && project.status === 'ongoing' ? ' selected' : (!project ? ' selected' : '')) + '>進行中</option>' +
+                '<option value="completed"' + (project && project.status === 'completed' ? ' selected' : '') + '>已完工</option>' +
+                '<option value="closed"' + (project && project.status === 'closed' ? ' selected' : '') + '>已結案</option>' +
+                '</select></div>' +
                 '<div class="flex justify-end gap-2 mt-6">' +
                 '<button id="mProjCancel" class="px-4 py-2 rounded-lg bg-slate-700">取消</button>' +
                 '<button id="mProjSave" class="btn-primary px-4 py-2 rounded-lg" data-id="' + (project ? project.id : '') + '">儲存</button>' +
@@ -1071,8 +1118,11 @@
                 orderAmount: orderAmount,
                 materialCost: parseFloat($('mProjMaterial').value) || 0,
                 laborCost: parseFloat($('mProjLabor').value) || 0,
+                status: $('mProjStatus').value || 'ongoing',
                 commission: 0,
                 collectionRate: 0,
+                bonusStatus: 'pending',
+                bonusPaidDate: null,
                 createdAt: new Date().toISOString()
             };
 
@@ -1082,6 +1132,9 @@
                     if (projects[j].id === editId) {
                         projData.commission = projects[j].commission || 0;
                         projData.collectionRate = projects[j].collectionRate || 0;
+                        projData.bonusStatus = projects[j].bonusStatus || 'pending';
+                        projData.bonusPaidDate = projects[j].bonusPaidDate || null;
+                        projData.createdAt = projects[j].createdAt;
                         projects[j] = projData;
                         break;
                     }
@@ -1103,7 +1156,7 @@
                 if (projects[i].id === id) { project = projects[i]; break; }
             }
             if (!project) return;
-            confirmDialog('確定要刪除專案「' + project.code + ' ' + project.name + '」？相關佣金也會一併刪除。', function() {
+            confirmDialog('確定要刪除專案「' + project.code + ' ' + project.name + '」？相關應收、應付、佣金也會一併刪除。', function() {
                 var list = getData('projects');
                 var newList = [];
                 for (var i = 0; i < list.length; i++) {
@@ -1117,14 +1170,29 @@
                     if (commList[j].projectId !== id) newComm.push(commList[j]);
                 }
                 setData('commissions', newComm);
+                // Also remove related AR records
+                var arList = getData('ar');
+                var newAr = [];
+                for (var a = 0; a < arList.length; a++) {
+                    if (arList[a].projectId !== id) newAr.push(arList[a]);
+                }
+                setData('ar', newAr);
+                // Also remove related AP records
+                var apList = getData('ap');
+                var newAp = [];
+                for (var b = 0; b < apList.length; b++) {
+                    if (apList[b].projectId !== id) newAp.push(apList[b]);
+                }
+                setData('ap', newAp);
                 loadProjectList();
-                toast('已刪除專案', 'success');
+                toast('已刪除專案及相關記錄', 'success');
             });
         }
 
         // ============== 佣金管理 ==============
         function loadCommissionList() {
             var commList = getData('commissions');
+            var searchTerm = ($('commSearch') ? $('commSearch').value : '').toLowerCase();
 
             var agentTotal = 0, referralTotal = 0, rebateTotal = 0;
             for (var i = 0; i < commList.length; i++) {
@@ -1137,15 +1205,30 @@
             $('commReferral').textContent = fmt(referralTotal);
             $('commRebate').textContent = fmt(rebateTotal);
 
+            // Apply search filter
+            var filtered = commList;
+            if (searchTerm) {
+                filtered = [];
+                for (var f = 0; f < commList.length; f++) {
+                    var fc = commList[f];
+                    var typeName = COMM_TYPES[fc.type] || fc.type || '';
+                    if ((fc.projectCode || '').toLowerCase().indexOf(searchTerm) >= 0 ||
+                        typeName.toLowerCase().indexOf(searchTerm) >= 0 ||
+                        (fc.description || '').toLowerCase().indexOf(searchTerm) >= 0) {
+                        filtered.push(fc);
+                    }
+                }
+            }
+
             var tbody = $('commTableBody');
-            if (commList.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400">暫無佣金記錄，點擊「新增佣金」建立</td></tr>';
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400">' + (searchTerm ? '無符合搜尋結果' : '暫無佣金記錄，點擊「新增佣金」建立') + '</td></tr>';
                 return;
             }
 
             var html = '';
-            for (var j = 0; j < commList.length; j++) {
-                var comm = commList[j];
+            for (var j = 0; j < filtered.length; j++) {
+                var comm = filtered[j];
                 html += '<tr class="border-t border-slate-700 hover:bg-slate-800/50">' +
                     '<td class="p-4">' + esc(comm.projectCode||'-') + '</td>' +
                     '<td class="p-4"><span class="px-2 py-1 rounded text-xs ' +
@@ -1292,7 +1375,7 @@
             var tbody = $('bonusTableBody');
 
             if (projects.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400">暫無專案資料</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400">暫無專案資料</td></tr>';
                 return;
             }
 
@@ -1303,6 +1386,26 @@
                 var bonus = (p.orderAmount||0) - (p.commission||0) - cost;
                 var rate = p.collectionRate || 0;
                 var eligible = rate >= THRESHOLD && bonus > 0;
+                var bonusStatus = p.bonusStatus || 'pending';
+                var isPaid = bonusStatus === 'paid';
+
+                var statusHtml = '';
+                if (isPaid) {
+                    statusHtml = '<span class="text-blue-400">✓ 已發放</span>' + (p.bonusPaidDate ? '<div class="text-xs text-slate-400">' + fmtDate(p.bonusPaidDate) + '</div>' : '');
+                } else if (eligible) {
+                    statusHtml = '<span class="text-green-400">✓ 可發放</span>';
+                } else {
+                    statusHtml = '<span class="text-slate-400">未達標</span>';
+                }
+
+                var actionHtml = '';
+                if (isPaid) {
+                    actionHtml = '<button class="text-amber-400 text-sm" data-cancel-bonus="' + p.id + '">取消發放</button>';
+                } else if (eligible) {
+                    actionHtml = '<button class="btn-primary text-sm px-3 py-1 rounded" data-pay-bonus="' + p.id + '">發放獎金</button>';
+                } else {
+                    actionHtml = '<span class="text-slate-500">-</span>';
+                }
 
                 html += '<tr class="border-t border-slate-700">' +
                     '<td class="p-4"><div class="font-medium">' + esc(p.code) + '</div><div class="text-xs text-slate-400">' + esc(p.name) + '</div></td>' +
@@ -1311,10 +1414,43 @@
                     '<td class="p-4 text-right mono text-amber-400">' + fmt(cost) + '</td>' +
                     '<td class="p-4 text-right mono ' + (bonus >= 0 ? 'text-green-400' : 'text-red-400') + '">' + fmt(bonus) + '</td>' +
                     '<td class="p-4 text-center"><span class="px-2 py-1 rounded ' + (rate >= THRESHOLD ? 'bg-green-500/20 text-green-300' : 'bg-amber-500/20 text-amber-300') + '">' + rate.toFixed(1) + '%</span></td>' +
-                    '<td class="p-4">' + (eligible ? '<span class="text-green-400">✓ 可發放</span>' : '<span class="text-slate-400">未達標</span>') + '</td>' +
+                    '<td class="p-4">' + statusHtml + '</td>' +
+                    '<td class="p-4">' + actionHtml + '</td>' +
                     '</tr>';
             }
             tbody.innerHTML = html;
+        }
+
+        function markBonusPaid(projectId) {
+            var projects = getData('projects');
+            for (var i = 0; i < projects.length; i++) {
+                if (projects[i].id === projectId) {
+                    projects[i].bonusStatus = 'paid';
+                    projects[i].bonusPaidDate = new Date().toISOString();
+                    break;
+                }
+            }
+            setData('projects', projects);
+            loadBonusList();
+            loadDashboard();
+            toast('已標記獎金發放', 'success');
+        }
+
+        function cancelBonusPaid(projectId) {
+            confirmDialog('確定要取消此獎金的發放狀態？', function() {
+                var projects = getData('projects');
+                for (var i = 0; i < projects.length; i++) {
+                    if (projects[i].id === projectId) {
+                        projects[i].bonusStatus = 'pending';
+                        projects[i].bonusPaidDate = null;
+                        break;
+                    }
+                }
+                setData('projects', projects);
+                loadBonusList();
+                loadDashboard();
+                toast('已取消獎金發放', 'success');
+            });
         }
 
         // ============== 設定 ==============
@@ -1407,15 +1543,22 @@
         }
 
         function deleteCustomer(code) {
-            confirmDialog('確定要刪除此客戶？（代碼：' + code + '）', function() {
+            confirmDialog('確定要刪除此客戶？相關應收帳款也會一併刪除。（代碼：' + code + '）', function() {
                 var list = getData('customers');
                 var newList = [];
                 for (var i = 0; i < list.length; i++) {
                     if (list[i].code !== code) newList.push(list[i]);
                 }
                 setData('customers', newList);
+                // Also remove related AR records
+                var arList = getData('ar');
+                var newAr = [];
+                for (var j = 0; j < arList.length; j++) {
+                    if (arList[j].customerCode !== code) newAr.push(arList[j]);
+                }
+                setData('ar', newAr);
                 loadSettings();
-                toast('已刪除客戶', 'success');
+                toast('已刪除客戶及相關記錄', 'success');
             });
         }
 
@@ -1463,15 +1606,22 @@
         }
 
         function deleteSupplier(code) {
-            confirmDialog('確定要刪除此供應商？（代碼：' + code + '）', function() {
+            confirmDialog('確定要刪除此供應商？相關應付帳款也會一併刪除。（代碼：' + code + '）', function() {
                 var list = getData('suppliers');
                 var newList = [];
                 for (var i = 0; i < list.length; i++) {
                     if (list[i].code !== code) newList.push(list[i]);
                 }
                 setData('suppliers', newList);
+                // Also remove related AP records
+                var apList = getData('ap');
+                var newAp = [];
+                for (var j = 0; j < apList.length; j++) {
+                    if (apList[j].vendorCode !== code) newAp.push(apList[j]);
+                }
+                setData('ap', newAp);
                 loadSettings();
-                toast('已刪除供應商', 'success');
+                toast('已刪除供應商及相關記錄', 'success');
             });
         }
 
@@ -1519,8 +1669,23 @@
             reader.onload = function(ev) {
                 try {
                     var data = JSON.parse(ev.target.result);
-                    if (!data.data) {
-                        toast('無效的備份檔案格式', 'error');
+                    // Validate basic structure
+                    if (!data.data || typeof data.data !== 'object') {
+                        toast('無效的備份檔案格式：缺少 data 欄位', 'error');
+                        return;
+                    }
+                    // Validate data arrays are actually arrays
+                    var arrayKeys = ['ar', 'ap', 'projects', 'commissions', 'customers', 'suppliers'];
+                    for (var v = 0; v < arrayKeys.length; v++) {
+                        var k = arrayKeys[v];
+                        if (data.data[k] !== undefined && !Array.isArray(data.data[k])) {
+                            toast('無效的備份檔案格式：' + k + ' 必須是陣列', 'error');
+                            return;
+                        }
+                    }
+                    // Validate company is object if exists
+                    if (data.data.company !== undefined && (typeof data.data.company !== 'object' || Array.isArray(data.data.company))) {
+                        toast('無效的備份檔案格式：company 必須是物件', 'error');
                         return;
                     }
                     pendingImportData = data;
@@ -1609,6 +1774,9 @@
                 // Commission
                 if (target.hasAttribute('data-edit-comm')) openCommissionModal(target.getAttribute('data-edit-comm'));
                 if (target.hasAttribute('data-delete-comm')) deleteCommission(target.getAttribute('data-delete-comm'));
+                // Bonus
+                if (target.hasAttribute('data-pay-bonus')) markBonusPaid(target.getAttribute('data-pay-bonus'));
+                if (target.hasAttribute('data-cancel-bonus')) cancelBonusPaid(target.getAttribute('data-cancel-bonus'));
                 // Settings
                 if (target.hasAttribute('data-edit-customer')) openCustomerModal(target.getAttribute('data-edit-customer'));
                 if (target.hasAttribute('data-delete-customer')) deleteCustomer(target.getAttribute('data-delete-customer'));
@@ -1620,6 +1788,7 @@
             $('arSearch').addEventListener('input', function() { loadArList(); });
             $('apSearch').addEventListener('input', function() { loadApList(); });
             $('projectSearch').addEventListener('input', function() { loadProjectList(); });
+            $('commSearch').addEventListener('input', function() { loadCommissionList(); });
         }
 
         // ============== 初始化 ==============
