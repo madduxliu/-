@@ -44,7 +44,18 @@
                 <div class="mt-3 flex items-center gap-2">
                     <span class="w-2 h-2 rounded-full bg-green-500"></span>
                     <span class="text-xs text-slate-400">本機版</span>
-                    <span class="text-xs text-slate-500 ml-auto mono">v1.1</span>
+                    <span class="text-xs text-slate-500 ml-auto mono">v1.2</span>
+                </div>
+                <div class="mt-3">
+                    <select id="yearSelector" class="w-full input-field rounded-lg px-3 py-2 text-sm">
+                        <option value="all">全部年度</option>
+                        <option value="2025">2025 年度</option>
+                        <option value="2026" selected>2026 年度</option>
+                        <option value="2027">2027 年度</option>
+                        <option value="2028">2028 年度</option>
+                        <option value="2029">2029 年度</option>
+                        <option value="2030">2030 年度</option>
+                    </select>
                 </div>
             </div>
             <nav class="flex-1 overflow-y-auto py-4">
@@ -66,6 +77,9 @@
                 </div>
                 <div class="sidebar-item flex items-center gap-3 px-4 py-3" data-page="bonus">
                     <span class="text-lg">🎁</span><div><p class="font-medium">獎金結算</p><p class="text-xs text-slate-400">訂單-佣金-成本×1.15</p></div>
+                </div>
+                <div class="sidebar-item flex items-center gap-3 px-4 py-3" data-page="yearly">
+                    <span class="text-lg">📈</span><div><p class="font-medium">年度統計</p><p class="text-xs text-slate-400">跨年度分析</p></div>
                 </div>
                 <div class="px-3 my-4"><hr class="border-slate-700"></div>
                 <div class="px-3 mb-2"><span class="text-xs font-medium text-slate-500 uppercase">系統</span></div>
@@ -263,6 +277,55 @@
                 </div>
             </div>
 
+            <!-- 年度統計 -->
+            <div id="page-yearly" class="page-content p-6">
+                <h2 class="text-2xl font-bold mb-6">📈 年度統計</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <div class="data-table rounded-xl p-6">
+                        <h3 class="font-bold text-lg mb-4">年度營收比較</h3>
+                        <div id="yearlyRevenueChart" class="space-y-3"></div>
+                    </div>
+                    <div class="data-table rounded-xl p-6">
+                        <h3 class="font-bold text-lg mb-4">年度支出比較</h3>
+                        <div id="yearlyExpenseChart" class="space-y-3"></div>
+                    </div>
+                </div>
+                <div class="data-table rounded-xl p-6 mb-6">
+                    <h3 class="font-bold text-lg mb-4">跨年度統計表</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="text-left text-sm text-slate-400 border-b border-slate-700">
+                                    <th class="p-4">年度</th>
+                                    <th class="p-4 text-right">應收總額</th>
+                                    <th class="p-4 text-right">已收金額</th>
+                                    <th class="p-4 text-right">應付總額</th>
+                                    <th class="p-4 text-right">已付金額</th>
+                                    <th class="p-4 text-right">專案數</th>
+                                    <th class="p-4 text-right">獎金總額</th>
+                                    <th class="p-4 text-center">收款率</th>
+                                </tr>
+                            </thead>
+                            <tbody id="yearlyStatsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="data-table rounded-xl p-6">
+                        <h3 class="font-bold text-lg mb-4">客戶營收排行</h3>
+                        <div id="customerRankList" class="space-y-2"></div>
+                    </div>
+                    <div class="data-table rounded-xl p-6">
+                        <h3 class="font-bold text-lg mb-4">供應商支出排行</h3>
+                        <div id="supplierRankList" class="space-y-2"></div>
+                    </div>
+                    <div class="data-table rounded-xl p-6">
+                        <h3 class="font-bold text-lg mb-4">專案獎金排行</h3>
+                        <div id="projectBonusRankList" class="space-y-2"></div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 資料備份 -->
             <div id="page-backup" class="page-content p-6">
                 <h2 class="text-2xl font-bold mb-6">💾 資料備份</h2>
@@ -352,9 +415,10 @@
     (function() {
         'use strict';
 
-        var VERSION = '1.1';
+        var VERSION = '1.2';
         var FACTOR = 1.15;
         var THRESHOLD = 80;
+        var currentYear = '2026';
 
         var DEFAULT_CUSTOMERS = [
             {code:'C001', name:'國瑞汽車股份有限公司', shortName:'國瑞汽車'},
@@ -374,6 +438,32 @@
         function genId(p) { return (p||'id') + '_' + Date.now() + '_' + Math.random().toString(36).substr(2,4); }
         function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
         function escAttr(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+        function getSelectedYear() {
+            var sel = $('yearSelector');
+            return sel ? sel.value : 'all';
+        }
+
+        function getYearFromDate(dateStr) {
+            if (!dateStr) return null;
+            var d = new Date(dateStr);
+            return isNaN(d.getTime()) ? null : d.getFullYear();
+        }
+
+        function filterByYear(list, dateField) {
+            var year = getSelectedYear();
+            if (year === 'all') return list;
+            var yearNum = parseInt(year, 10);
+            var result = [];
+            for (var i = 0; i < list.length; i++) {
+                var item = list[i];
+                var itemYear = getYearFromDate(item[dateField]);
+                if (itemYear === yearNum) {
+                    result.push(item);
+                }
+            }
+            return result;
+        }
 
         function getData(k) {
             try { return JSON.parse(localStorage.getItem('zt_'+k)) || []; }
@@ -507,6 +597,7 @@
                 case 'projects': loadProjectList(); break;
                 case 'commission': loadCommissionList(); break;
                 case 'bonus': loadBonusList(); break;
+                case 'yearly': loadYearlyStats(); break;
                 case 'settings': loadSettings(); break;
                 case 'backup': loadBackupPage(); break;
             }
@@ -514,8 +605,8 @@
 
         // ============== 儀表板 ==============
         function loadDashboard() {
-            var arList = getData('ar');
-            var apList = getData('ap');
+            var arList = filterByYear(getData('ar'), 'dueDate');
+            var apList = filterByYear(getData('ap'), 'dueDate');
             var projects = getData('projects');
 
             var arTotal = 0, arCount = 0, overdueTotal = 0, overdueCount = 0;
@@ -590,7 +681,7 @@
 
         // ============== 應收帳款 ==============
         function loadArList() {
-            var arList = getData('ar');
+            var arList = filterByYear(getData('ar'), 'dueDate');
             var searchVal = ($('arSearch') ? $('arSearch').value : '').toLowerCase();
             var tbody = $('arTableBody');
 
@@ -848,7 +939,7 @@
 
         // ============== 應付帳款 ==============
         function loadApList() {
-            var apList = getData('ap');
+            var apList = filterByYear(getData('ap'), 'dueDate');
             var searchVal = ($('apSearch') ? $('apSearch').value : '').toLowerCase();
 
             var checkTotal = 0, transferTotal = 0, cashTotal = 0;
@@ -1260,7 +1351,7 @@
 
         // ============== 佣金管理 ==============
         function loadCommissionList() {
-            var commList = getData('commissions');
+            var commList = filterByYear(getData('commissions'), 'date');
             var searchTerm = ($('commSearch') ? $('commSearch').value : '').toLowerCase();
 
             var agentTotal = 0, referralTotal = 0, rebateTotal = 0;
@@ -1707,6 +1798,204 @@
             });
         }
 
+        // ============== 年度統計 ==============
+        function loadYearlyStats() {
+            var arList = getData('ar');
+            var apList = getData('ap');
+            var projects = getData('projects');
+            var customers = getData('customers');
+            var suppliers = getData('suppliers');
+
+            var years = [2025, 2026, 2027, 2028, 2029, 2030];
+            var yearlyData = {};
+
+            // Initialize yearly data
+            for (var y = 0; y < years.length; y++) {
+                yearlyData[years[y]] = {
+                    arTotal: 0, arPaid: 0, apTotal: 0, apPaid: 0,
+                    projectCount: 0, bonusTotal: 0
+                };
+            }
+
+            // Calculate AR by year (using dueDate)
+            for (var i = 0; i < arList.length; i++) {
+                var ar = arList[i];
+                var year = getYearFromDate(ar.dueDate);
+                if (year && yearlyData[year]) {
+                    yearlyData[year].arTotal += ar.amount || 0;
+                    yearlyData[year].arPaid += ar.paidAmount || 0;
+                }
+            }
+
+            // Calculate AP by year (using dueDate)
+            for (var j = 0; j < apList.length; j++) {
+                var ap = apList[j];
+                var apYear = getYearFromDate(ap.dueDate);
+                if (apYear && yearlyData[apYear]) {
+                    yearlyData[apYear].apTotal += ap.amount || 0;
+                    if (ap.status === 'paid') {
+                        yearlyData[apYear].apPaid += ap.amount || 0;
+                    }
+                }
+            }
+
+            // Calculate projects and bonuses by year (using createdAt or first AR dueDate)
+            for (var k = 0; k < projects.length; k++) {
+                var proj = projects[k];
+                var projYear = getYearFromDate(proj.createdAt) || 2026;
+                if (yearlyData[projYear]) {
+                    yearlyData[projYear].projectCount++;
+                    var bonus = calcProjectBonus(proj);
+                    if (bonus > 0) {
+                        yearlyData[projYear].bonusTotal += bonus;
+                    }
+                }
+            }
+
+            // Render yearly stats table
+            var html = '';
+            var maxRevenue = 0, maxExpense = 0;
+            for (var m = 0; m < years.length; m++) {
+                var yr = years[m];
+                var d = yearlyData[yr];
+                if (d.arTotal > maxRevenue) maxRevenue = d.arTotal;
+                if (d.apTotal > maxExpense) maxExpense = d.apTotal;
+            }
+
+            for (var n = 0; n < years.length; n++) {
+                var year2 = years[n];
+                var data = yearlyData[year2];
+                var rate = data.arTotal > 0 ? Math.round((data.arPaid / data.arTotal) * 100) : 0;
+                html += '<tr class="border-b border-slate-700 hover:bg-slate-800">';
+                html += '<td class="p-4 font-bold">' + year2 + ' 年</td>';
+                html += '<td class="p-4 text-right mono">' + fmt(data.arTotal) + '</td>';
+                html += '<td class="p-4 text-right mono text-green-400">' + fmt(data.arPaid) + '</td>';
+                html += '<td class="p-4 text-right mono">' + fmt(data.apTotal) + '</td>';
+                html += '<td class="p-4 text-right mono text-red-400">' + fmt(data.apPaid) + '</td>';
+                html += '<td class="p-4 text-right">' + data.projectCount + '</td>';
+                html += '<td class="p-4 text-right mono text-amber-400">' + fmt(data.bonusTotal) + '</td>';
+                html += '<td class="p-4 text-center"><span class="' + (rate >= 80 ? 'text-green-400' : 'text-red-400') + '">' + rate + '%</span></td>';
+                html += '</tr>';
+            }
+            $('yearlyStatsBody').innerHTML = html;
+
+            // Render revenue chart
+            var revenueChart = '';
+            for (var p = 0; p < years.length; p++) {
+                var ry = years[p];
+                var rd = yearlyData[ry];
+                var rw = maxRevenue > 0 ? Math.round((rd.arTotal / maxRevenue) * 100) : 0;
+                revenueChart += '<div class="flex items-center gap-3">';
+                revenueChart += '<span class="w-16 text-sm text-slate-400">' + ry + '</span>';
+                revenueChart += '<div class="flex-1 bg-slate-700 rounded-full h-4">';
+                revenueChart += '<div class="bg-emerald-500 h-4 rounded-full transition-all" style="width:' + rw + '%"></div>';
+                revenueChart += '</div>';
+                revenueChart += '<span class="w-28 text-right text-sm mono">' + fmt(rd.arTotal) + '</span>';
+                revenueChart += '</div>';
+            }
+            $('yearlyRevenueChart').innerHTML = revenueChart;
+
+            // Render expense chart
+            var expenseChart = '';
+            for (var q = 0; q < years.length; q++) {
+                var ey = years[q];
+                var ed = yearlyData[ey];
+                var ew = maxExpense > 0 ? Math.round((ed.apTotal / maxExpense) * 100) : 0;
+                expenseChart += '<div class="flex items-center gap-3">';
+                expenseChart += '<span class="w-16 text-sm text-slate-400">' + ey + '</span>';
+                expenseChart += '<div class="flex-1 bg-slate-700 rounded-full h-4">';
+                expenseChart += '<div class="bg-rose-500 h-4 rounded-full transition-all" style="width:' + ew + '%"></div>';
+                expenseChart += '</div>';
+                expenseChart += '<span class="w-28 text-right text-sm mono">' + fmt(ed.apTotal) + '</span>';
+                expenseChart += '</div>';
+            }
+            $('yearlyExpenseChart').innerHTML = expenseChart;
+
+            // Customer revenue ranking
+            var customerTotals = {};
+            for (var ci = 0; ci < arList.length; ci++) {
+                var arItem = arList[ci];
+                var ccode = arItem.customerCode || 'unknown';
+                if (!customerTotals[ccode]) customerTotals[ccode] = 0;
+                customerTotals[ccode] += arItem.amount || 0;
+            }
+            var customerRank = [];
+            for (var cc in customerTotals) {
+                if (customerTotals.hasOwnProperty(cc)) {
+                    var cust = customers.filter(function(c){ return c.code === cc; })[0];
+                    customerRank.push({
+                        code: cc,
+                        name: cust ? (cust.shortName || cust.name) : cc,
+                        total: customerTotals[cc]
+                    });
+                }
+            }
+            customerRank.sort(function(a,b){ return b.total - a.total; });
+            var custHtml = '';
+            for (var cri = 0; cri < Math.min(5, customerRank.length); cri++) {
+                var cr = customerRank[cri];
+                custHtml += '<div class="flex justify-between items-center py-2 border-b border-slate-700">';
+                custHtml += '<span>' + (cri + 1) + '. ' + esc(cr.name) + '</span>';
+                custHtml += '<span class="mono text-emerald-400">' + fmt(cr.total) + '</span>';
+                custHtml += '</div>';
+            }
+            $('customerRankList').innerHTML = custHtml || '<p class="text-slate-500">尚無資料</p>';
+
+            // Supplier expense ranking
+            var supplierTotals = {};
+            for (var si = 0; si < apList.length; si++) {
+                var apItem = apList[si];
+                var vcode = apItem.vendorCode || 'unknown';
+                if (!supplierTotals[vcode]) supplierTotals[vcode] = 0;
+                supplierTotals[vcode] += apItem.amount || 0;
+            }
+            var supplierRank = [];
+            for (var vc in supplierTotals) {
+                if (supplierTotals.hasOwnProperty(vc)) {
+                    var sup = suppliers.filter(function(s){ return s.code === vc; })[0];
+                    supplierRank.push({
+                        code: vc,
+                        name: sup ? sup.name : vc,
+                        total: supplierTotals[vc]
+                    });
+                }
+            }
+            supplierRank.sort(function(a,b){ return b.total - a.total; });
+            var supHtml = '';
+            for (var sri = 0; sri < Math.min(5, supplierRank.length); sri++) {
+                var sr = supplierRank[sri];
+                supHtml += '<div class="flex justify-between items-center py-2 border-b border-slate-700">';
+                supHtml += '<span>' + (sri + 1) + '. ' + esc(sr.name) + '</span>';
+                supHtml += '<span class="mono text-rose-400">' + fmt(sr.total) + '</span>';
+                supHtml += '</div>';
+            }
+            $('supplierRankList').innerHTML = supHtml || '<p class="text-slate-500">尚無資料</p>';
+
+            // Project bonus ranking
+            var projBonusRank = [];
+            for (var pi = 0; pi < projects.length; pi++) {
+                var prj = projects[pi];
+                var pbonus = calcProjectBonus(prj);
+                if (pbonus > 0) {
+                    projBonusRank.push({
+                        code: prj.code,
+                        name: prj.name,
+                        bonus: pbonus
+                    });
+                }
+            }
+            projBonusRank.sort(function(a,b){ return b.bonus - a.bonus; });
+            var projHtml = '';
+            for (var pbi = 0; pbi < Math.min(5, projBonusRank.length); pbi++) {
+                var pb = projBonusRank[pbi];
+                projHtml += '<div class="flex justify-between items-center py-2 border-b border-slate-700">';
+                projHtml += '<span>' + (pbi + 1) + '. ' + esc(pb.name.substring(0, 15)) + '</span>';
+                projHtml += '<span class="mono text-amber-400">' + fmt(pb.bonus) + '</span>';
+                projHtml += '</div>';
+            }
+            $('projectBonusRankList').innerHTML = projHtml || '<p class="text-slate-500">尚無可發放獎金專案</p>';
+        }
+
         // ============== 資料備份 ==============
         function loadBackupPage() {
             var stats = '';
@@ -2141,6 +2430,16 @@
             $('apSearch').addEventListener('input', function() { loadApList(); });
             $('projectSearch').addEventListener('input', function() { loadProjectList(); });
             $('commSearch').addEventListener('input', function() { loadCommissionList(); });
+
+            // Year selector
+            $('yearSelector').addEventListener('change', function() {
+                currentYear = this.value;
+                var activePage = document.querySelector('.page-content.active');
+                if (activePage) {
+                    var pageId = activePage.id.replace('page-', '');
+                    showPage(pageId);
+                }
+            });
         }
 
         // ============== 初始化 ==============
